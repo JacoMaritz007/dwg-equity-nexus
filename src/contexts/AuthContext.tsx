@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { authService } from '@/services/authService';
 
 export interface User {
   id: string;
@@ -9,6 +10,8 @@ export interface User {
   isAccredited: boolean;
   profilesCount: number;
   lastLoginAt: string;
+  role: 'investor' | 'admin' | 'viewer';
+  permissions: string[];
 }
 
 interface AuthContextType {
@@ -19,6 +22,9 @@ interface AuthContextType {
   logout: () => void;
   resetPassword: (email: string) => Promise<void>;
   isAuthenticated: boolean;
+  hasPermission: (permission: string) => boolean;
+  hasRole: (role: string) => boolean;
+  canAccess: (resource: string, action?: string) => boolean;
 }
 
 interface RegisterData {
@@ -54,15 +60,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Check for existing auth session
     const initAuth = async () => {
       try {
-        const token = localStorage.getItem('auth_token');
+        const token = authService.getToken();
         if (token) {
           // Validate token and get user data
-          const userData = await validateToken(token);
+          const userData = await authService.validateToken(token);
           setUser(userData);
         }
       } catch (error) {
         console.error('Auth initialization error:', error);
-        localStorage.removeItem('auth_token');
+        authService.clearTokens();
       } finally {
         setLoading(false);
       }
@@ -74,19 +80,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, password: string) => {
     try {
       setLoading(true);
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Login failed');
-      }
-
-      const { user: userData, token } = await response.json();
-      localStorage.setItem('auth_token', token);
+      const { user: userData, token, refreshToken } = await authService.login(email, password);
+      authService.setTokens(token, refreshToken);
       setUser(userData);
       navigate('/dashboard');
     } catch (error) {
@@ -100,17 +95,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const register = async (userData: RegisterData) => {
     try {
       setLoading(true);
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(userData),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Registration failed');
-      }
-
+      await authService.register(userData);
       // Registration successful - user needs to verify email
       navigate('/auth?verify=true');
     } catch (error) {
@@ -122,39 +107,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = () => {
-    localStorage.removeItem('auth_token');
+    authService.clearTokens();
     setUser(null);
     navigate('/auth');
   };
 
   const resetPassword = async (email: string) => {
     try {
-      const response = await fetch('/api/auth/reset-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Password reset failed');
-      }
+      await authService.resetPassword(email);
     } catch (error) {
       console.error('Password reset error:', error);
       throw error;
     }
   };
 
-  const validateToken = async (token: string): Promise<User> => {
-    const response = await fetch('/api/auth/validate', {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+  // Authorization functions
+  const hasPermission = (permission: string): boolean => {
+    return user?.permissions?.includes(permission) || false;
+  };
 
-    if (!response.ok) {
-      throw new Error('Token validation failed');
-    }
+  const hasRole = (role: string): boolean => {
+    return user?.role === role;
+  };
 
-    return response.json();
+  const canAccess = (resource: string, action: string = 'read'): boolean => {
+    if (!user) return false;
+    
+    // Admin can access everything
+    if (user.role === 'admin') return true;
+    
+    // Check specific permissions
+    const permission = `${resource}:${action}`;
+    return hasPermission(permission) || hasPermission(`${resource}:*`);
   };
 
   const value = {
@@ -165,6 +149,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     logout,
     resetPassword,
     isAuthenticated: !!user,
+    hasPermission,
+    hasRole,
+    canAccess,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
