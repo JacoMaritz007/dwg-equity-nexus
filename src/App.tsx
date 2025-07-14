@@ -8,6 +8,9 @@ import { Navigation } from "@/components/layout/Navigation";
 import { AuthPage } from "@/pages/AuthPage";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { InvestPage } from "@/pages/InvestPage";
+import { MyInvestmentsPage } from "@/pages/MyInvestmentsPage";
+import { UpdatesPage } from "@/pages/UpdatesPage";
+import { TransactionsPage } from "@/pages/TransactionsPage";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 
 const queryClient = new QueryClient();
@@ -50,10 +53,7 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <Navigation />
-                    <div className="container mx-auto p-6">
-                      <h1 className="text-3xl font-bold">My Investments</h1>
-                      <p className="text-muted-foreground mt-2">Coming soon...</p>
-                    </div>
+                    <MyInvestmentsPage />
                   </ProtectedRoute>
                 }
               />
@@ -62,10 +62,7 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <Navigation />
-                    <div className="container mx-auto p-6">
-                      <h1 className="text-3xl font-bold">Updates</h1>
-                      <p className="text-muted-foreground mt-2">Coming soon...</p>
-                    </div>
+                    <UpdatesPage />
                   </ProtectedRoute>
                 }
               />
@@ -74,10 +71,7 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <Navigation />
-                    <div className="container mx-auto p-6">
-                      <h1 className="text-3xl font-bold">Transactions</h1>
-                      <p className="text-muted-foreground mt-2">Coming soon...</p>
-                    </div>
+                    <TransactionsPage />
                   </ProtectedRoute>
                 }
               />
