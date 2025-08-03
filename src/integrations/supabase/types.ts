@@ -10,20 +10,399 @@ export type Database = {
   // Allows to automatically instanciate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "12.2.3 (519615d)"
+    PostgrestVersion: "12.2.12 (cd3cf9e)"
   }
   public: {
     Tables: {
-      [_ in never]: never
+      capital_calls: {
+        Row: {
+          amount_per_share: number
+          created_at: string
+          created_by: string
+          description: string | null
+          due_date: string
+          id: string
+          offering_id: string
+          status: Database["public"]["Enums"]["capital_call_status"] | null
+          title: string
+        }
+        Insert: {
+          amount_per_share: number
+          created_at?: string
+          created_by: string
+          description?: string | null
+          due_date: string
+          id?: string
+          offering_id: string
+          status?: Database["public"]["Enums"]["capital_call_status"] | null
+          title: string
+        }
+        Update: {
+          amount_per_share?: number
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          due_date?: string
+          id?: string
+          offering_id?: string
+          status?: Database["public"]["Enums"]["capital_call_status"] | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "capital_calls_offering_id_fkey"
+            columns: ["offering_id"]
+            isOneToOne: false
+            referencedRelation: "investment_offerings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      documents: {
+        Row: {
+          created_at: string
+          description: string | null
+          document_type: Database["public"]["Enums"]["document_type"]
+          file_path: string
+          file_size: number | null
+          id: string
+          is_public: boolean | null
+          mime_type: string | null
+          offering_id: string | null
+          title: string
+          uploaded_by: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          document_type: Database["public"]["Enums"]["document_type"]
+          file_path: string
+          file_size?: number | null
+          id?: string
+          is_public?: boolean | null
+          mime_type?: string | null
+          offering_id?: string | null
+          title: string
+          uploaded_by: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          document_type?: Database["public"]["Enums"]["document_type"]
+          file_path?: string
+          file_size?: number | null
+          id?: string
+          is_public?: boolean | null
+          mime_type?: string | null
+          offering_id?: string | null
+          title?: string
+          uploaded_by?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "documents_offering_id_fkey"
+            columns: ["offering_id"]
+            isOneToOne: false
+            referencedRelation: "investment_offerings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      investment_offerings: {
+        Row: {
+          closing_date: string | null
+          created_at: string
+          created_by: string
+          description: string | null
+          expected_return: string | null
+          id: string
+          image_url: string | null
+          investment_term: string | null
+          investment_type: string
+          location: string | null
+          maximum_investment: number | null
+          minimum_investment: number
+          raised_amount: number | null
+          status: Database["public"]["Enums"]["investment_status"] | null
+          target_amount: number
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          closing_date?: string | null
+          created_at?: string
+          created_by: string
+          description?: string | null
+          expected_return?: string | null
+          id?: string
+          image_url?: string | null
+          investment_term?: string | null
+          investment_type: string
+          location?: string | null
+          maximum_investment?: number | null
+          minimum_investment: number
+          raised_amount?: number | null
+          status?: Database["public"]["Enums"]["investment_status"] | null
+          target_amount: number
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          closing_date?: string | null
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          expected_return?: string | null
+          id?: string
+          image_url?: string | null
+          investment_term?: string | null
+          investment_type?: string
+          location?: string | null
+          maximum_investment?: number | null
+          minimum_investment?: number
+          raised_amount?: number | null
+          status?: Database["public"]["Enums"]["investment_status"] | null
+          target_amount?: number
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      investment_updates: {
+        Row: {
+          content: string
+          created_at: string
+          created_by: string
+          id: string
+          is_important: boolean | null
+          offering_id: string
+          title: string
+          update_type: string | null
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          created_by: string
+          id?: string
+          is_important?: boolean | null
+          offering_id: string
+          title: string
+          update_type?: string | null
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          is_important?: boolean | null
+          offering_id?: string
+          title?: string
+          update_type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "investment_updates_offering_id_fkey"
+            columns: ["offering_id"]
+            isOneToOne: false
+            referencedRelation: "investment_offerings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          address: string | null
+          city: string | null
+          country: string | null
+          created_at: string
+          date_of_birth: string | null
+          email: string | null
+          first_name: string | null
+          id: string
+          is_accredited: boolean | null
+          kyc_verified: boolean | null
+          last_name: string | null
+          phone: string | null
+          state: string | null
+          updated_at: string
+          zip_code: string | null
+        }
+        Insert: {
+          address?: string | null
+          city?: string | null
+          country?: string | null
+          created_at?: string
+          date_of_birth?: string | null
+          email?: string | null
+          first_name?: string | null
+          id: string
+          is_accredited?: boolean | null
+          kyc_verified?: boolean | null
+          last_name?: string | null
+          phone?: string | null
+          state?: string | null
+          updated_at?: string
+          zip_code?: string | null
+        }
+        Update: {
+          address?: string | null
+          city?: string | null
+          country?: string | null
+          created_at?: string
+          date_of_birth?: string | null
+          email?: string | null
+          first_name?: string | null
+          id?: string
+          is_accredited?: boolean | null
+          kyc_verified?: boolean | null
+          last_name?: string | null
+          phone?: string | null
+          state?: string | null
+          updated_at?: string
+          zip_code?: string | null
+        }
+        Relationships: []
+      }
+      transactions: {
+        Row: {
+          amount: number
+          created_at: string
+          description: string | null
+          id: string
+          investment_id: string | null
+          reference_number: string | null
+          transaction_date: string
+          type: Database["public"]["Enums"]["transaction_type"]
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          investment_id?: string | null
+          reference_number?: string | null
+          transaction_date?: string
+          type: Database["public"]["Enums"]["transaction_type"]
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          investment_id?: string | null
+          reference_number?: string | null
+          transaction_date?: string
+          type?: Database["public"]["Enums"]["transaction_type"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transactions_investment_id_fkey"
+            columns: ["investment_id"]
+            isOneToOne: false
+            referencedRelation: "user_investments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_investments: {
+        Row: {
+          created_at: string
+          id: string
+          investment_amount: number
+          investment_date: string
+          offering_id: string
+          shares: number | null
+          status: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          investment_amount: number
+          investment_date?: string
+          offering_id: string
+          shares?: number | null
+          status?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          investment_amount?: number
+          investment_date?: string
+          offering_id?: string
+          shares?: number | null
+          status?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_investments_offering_id_fkey"
+            columns: ["offering_id"]
+            isOneToOne: false
+            referencedRelation: "investment_offerings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _user_id: string
+          _role: Database["public"]["Enums"]["app_role"]
+        }
+        Returns: boolean
+      }
+      is_admin: {
+        Args: { _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "investor" | "manager"
+      capital_call_status: "pending" | "completed" | "overdue"
+      document_type:
+        | "offering_document"
+        | "legal_agreement"
+        | "financial_report"
+        | "tax_document"
+        | "update"
+      investment_status: "draft" | "active" | "closed" | "cancelled"
+      transaction_type: "contribution" | "distribution" | "fee" | "expense"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +529,18 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "investor", "manager"],
+      capital_call_status: ["pending", "completed", "overdue"],
+      document_type: [
+        "offering_document",
+        "legal_agreement",
+        "financial_report",
+        "tax_document",
+        "update",
+      ],
+      investment_status: ["draft", "active", "closed", "cancelled"],
+      transaction_type: ["contribution", "distribution", "fee", "expense"],
+    },
   },
 } as const
