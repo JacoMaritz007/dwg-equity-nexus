@@ -19,6 +19,7 @@ import AdminDashboard from "@/pages/admin/AdminDashboard";
 import OfferingsManagement from "@/pages/admin/OfferingsManagement";
 import CreateOffering from "@/pages/admin/CreateOffering";
 import UserManagement from "@/pages/admin/UserManagement";
+import AdminDocuments from "@/pages/admin/AdminDocuments";
 
 const queryClient = new QueryClient();
 
@@ -182,6 +183,15 @@ const App = () => (
                   <AuthorizedRoute requiredRole="admin">
                     <Navigation />
                     <UserManagement />
+                  </AuthorizedRoute>
+                }
+              />
+              <Route
+                path="/admin/documents"
+                element={
+                  <AuthorizedRoute requiredRole="admin">
+                    <Navigation />
+                    <AdminDocuments />
                   </AuthorizedRoute>
                 }
               />
