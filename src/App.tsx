@@ -12,6 +12,11 @@ import { MyInvestmentsPage } from "@/pages/MyInvestmentsPage";
 import { UpdatesPage } from "@/pages/UpdatesPage";
 import { TransactionsPage } from "@/pages/TransactionsPage";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import { AuthorizedRoute } from "@/components/auth/AuthorizedRoute";
+import AdminDashboard from "@/pages/admin/AdminDashboard";
+import OfferingsManagement from "@/pages/admin/OfferingsManagement";
+import CreateOffering from "@/pages/admin/CreateOffering";
+import UserManagement from "@/pages/admin/UserManagement";
 
 const queryClient = new QueryClient();
 
@@ -133,6 +138,44 @@ const App = () => (
                       <p className="text-muted-foreground mt-2">Coming soon...</p>
                     </div>
                   </ProtectedRoute>
+                }
+              />
+
+              {/* Admin Routes */}
+              <Route
+                path="/admin"
+                element={
+                  <AuthorizedRoute requiredRole="admin">
+                    <Navigation />
+                    <AdminDashboard />
+                  </AuthorizedRoute>
+                }
+              />
+              <Route
+                path="/admin/offerings"
+                element={
+                  <AuthorizedRoute requiredRole="admin">
+                    <Navigation />
+                    <OfferingsManagement />
+                  </AuthorizedRoute>
+                }
+              />
+              <Route
+                path="/admin/offerings/create"
+                element={
+                  <AuthorizedRoute requiredRole="admin">
+                    <Navigation />
+                    <CreateOffering />
+                  </AuthorizedRoute>
+                }
+              />
+              <Route
+                path="/admin/users"
+                element={
+                  <AuthorizedRoute requiredRole="admin">
+                    <Navigation />
+                    <UserManagement />
+                  </AuthorizedRoute>
                 }
               />
               

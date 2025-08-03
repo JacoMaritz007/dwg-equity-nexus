@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePermissions } from '@/hooks/usePermissions';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -19,7 +20,8 @@ import {
   Mail, 
   LogOut, 
   Menu,
-  ChevronDown
+  ChevronDown,
+  Shield
 } from 'lucide-react';
 
 const navigationItems = [
@@ -40,6 +42,7 @@ const profileMenuItems = [
 
 export const Navigation: React.FC = () => {
   const { user, logout } = useAuth();
+  const { isAdmin } = usePermissions();
   const location = useLocation();
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -131,6 +134,15 @@ export const Navigation: React.FC = () => {
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               
+              {isAdmin() && (
+                <DropdownMenuItem asChild>
+                  <Link to="/admin" className="flex items-center gap-2">
+                    <Shield className="h-4 w-4" />
+                    Admin Dashboard
+                  </Link>
+                </DropdownMenuItem>
+              )}
+              
               {profileMenuItems.map((item) => {
                 const Icon = item.icon;
                 return (
@@ -179,6 +191,16 @@ export const Navigation: React.FC = () => {
 
                 <div className="border-t pt-4">
                   <nav className="flex flex-col space-y-2">
+                    {isAdmin() && (
+                      <Link
+                        to="/admin"
+                        className="flex items-center gap-3 px-3 py-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                      >
+                        <Shield className="h-4 w-4" />
+                        Admin Dashboard
+                      </Link>
+                    )}
                     {profileMenuItems.map((item) => {
                       const Icon = item.icon;
                       return (
