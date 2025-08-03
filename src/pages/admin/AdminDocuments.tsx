@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { usePermissions } from '@/hooks/usePermissions';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -42,7 +42,7 @@ const AdminDocuments: React.FC = () => {
   const [selectedDocument, setSelectedDocument] = useState<VerificationDocumentWithUser | null>(null);
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
 
-  const fetchDocuments = async () => {
+  const fetchDocuments = useCallback(async () => {
     try {
       setLoading(true);
       
@@ -61,11 +61,30 @@ const AdminDocuments: React.FC = () => {
 
       if (error) throw error;
 
-      const formattedDocs = data?.map(doc => ({
-        ...doc,
-        user_email: (doc.profiles as any)?.email || 'Unknown',
-        user_name: `${(doc.profiles as any)?.first_name || ''} ${(doc.profiles as any)?.last_name || ''}`.trim() || 'Unknown'
-      })) || [];
+      const formattedDocs = data?.map(doc => {
+        const profile = doc.profiles as any;
+        const firstName = profile?.first_name?.trim() || '';
+        const lastName = profile?.last_name?.trim() || '';
+        const email = profile?.email || 'Unknown';
+        
+        // Create display name with fallback to email if no names available
+        let displayName = '';
+        if (firstName && lastName) {
+          displayName = `${firstName} ${lastName}`;
+        } else if (firstName) {
+          displayName = firstName;
+        } else if (lastName) {
+          displayName = lastName;
+        } else {
+          displayName = email;
+        }
+        
+        return {
+          ...doc,
+          user_email: email,
+          user_name: displayName
+        };
+      }) || [];
 
       setDocuments(formattedDocs);
     } catch (err) {
@@ -74,13 +93,13 @@ const AdminDocuments: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (isAdmin()) {
       fetchDocuments();
     }
-  }, [isAdmin]);
+  }, [isAdmin, fetchDocuments]);
 
   const handleReviewDocument = async (documentId: string, status: 'approved' | 'rejected', notes?: string) => {
     try {
@@ -104,17 +123,19 @@ const AdminDocuments: React.FC = () => {
     }
   };
 
-  const filteredDocuments = documents.filter(doc => {
-    const matchesSearch = searchTerm === '' || 
-      doc.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      doc.user_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      doc.user_email.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesStatus = statusFilter === 'all' || doc.verification_status === statusFilter;
-    const matchesType = typeFilter === 'all' || doc.document_type === typeFilter;
-    
-    return matchesSearch && matchesStatus && matchesType;
-  });
+  const filteredDocuments = useMemo(() => {
+    return documents.filter(doc => {
+      const matchesSearch = searchTerm === '' || 
+        doc.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        doc.user_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        doc.user_email.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesStatus = statusFilter === 'all' || doc.verification_status === statusFilter;
+      const matchesType = typeFilter === 'all' || doc.document_type === typeFilter;
+      
+      return matchesSearch && matchesStatus && matchesType;
+    });
+  }, [documents, searchTerm, statusFilter, typeFilter]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -142,12 +163,12 @@ const AdminDocuments: React.FC = () => {
     }
   };
 
-  const stats = {
+  const stats = useMemo(() => ({
     total: documents.length,
     pending: documents.filter(d => d.verification_status === 'pending').length,
     approved: documents.filter(d => d.verification_status === 'approved').length,
     rejected: documents.filter(d => d.verification_status === 'rejected').length,
-  };
+  }), [documents]);
 
   if (!isAdmin()) {
     return (
