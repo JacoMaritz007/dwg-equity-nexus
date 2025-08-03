@@ -148,9 +148,55 @@ export const CreateOfferingForm: React.FC = () => {
     
     setIsLoading(true);
     try {
-      // Create the offering record
+      // Create the offering record with proper field mapping
       const offeringData = {
-        ...data,
+        // Required fields
+        title: data.title,
+        investment_type: data.investment_type,
+        target_amount: data.target_amount,
+        minimum_investment: data.minimum_investment || data.target_amount * 0.01, // Default to 1% of target
+        
+        // Deal Overview fields
+        lister_name: data.lister_name,
+        product_name: data.product_name,
+        address: data.address,
+        targeted_irr: data.targeted_irr,
+        targeted_avg_coc: data.targeted_avg_coc,
+        distribution_overview: data.distribution_overview,
+        
+        // Optional fields
+        description: data.description,
+        location: data.location,
+        maximum_investment: data.maximum_investment,
+        expected_return: data.expected_return,
+        closing_date: data.closing_date ? new Date(data.closing_date).toISOString() : null,
+        
+        // Financial projections
+        tax_fee_adjusted_irr: data.tax_fee_adjusted_irr,
+        tax_fee_adjusted_coc: data.tax_fee_adjusted_coc,
+        tax_adjusted_em: data.tax_adjusted_em,
+        tax_adjusted_cg: data.tax_adjusted_cg,
+        coc_year_1: data.coc_year_1,
+        coc_year_2: data.coc_year_2,
+        coc_year_3: data.coc_year_3,
+        coc_year_4: data.coc_year_4,
+        coc_year_5: data.coc_year_5,
+        coc_year_6: data.coc_year_6,
+        coc_year_7: data.coc_year_7,
+        base_fee: data.base_fee,
+        structure_fee: data.structure_fee,
+        marketing_sales_fee: data.marketing_sales_fee,
+        success_fee: data.success_fee,
+        capital_gain_success_fee: data.capital_gain_success_fee,
+        
+        // Platform settings
+        disregard_user_levels: data.disregard_user_levels,
+        published_wealth_migrate: data.published_wealth_migrate,
+        published_private_wealth: data.published_private_wealth,
+        other_published: data.other_published,
+        enable_source_wealth_screen: data.enable_source_wealth_screen,
+        
+        // System fields
         status: (isDraft ? 'draft' : 'active') as 'draft' | 'active',
         created_by: user.id,
         raised_amount: 0,
