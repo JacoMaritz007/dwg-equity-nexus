@@ -113,59 +113,140 @@ export type Database = {
       }
       investment_offerings: {
         Row: {
+          address: string | null
+          base_fee: number | null
+          capital_gain_success_fee: number | null
           closing_date: string | null
+          coc_year_1: number | null
+          coc_year_2: number | null
+          coc_year_3: number | null
+          coc_year_4: number | null
+          coc_year_5: number | null
+          coc_year_6: number | null
+          coc_year_7: number | null
           created_at: string
           created_by: string
           description: string | null
+          disregard_user_levels: boolean | null
+          distribution_overview: string | null
+          enable_source_wealth_screen: boolean | null
           expected_return: string | null
           id: string
           image_url: string | null
           investment_term: string | null
           investment_type: string
+          lister_name: string | null
           location: string | null
+          marketing_sales_fee: number | null
           maximum_investment: number | null
           minimum_investment: number
+          other_published: boolean | null
+          product_name: string | null
+          published_private_wealth: boolean | null
+          published_wealth_migrate: boolean | null
           raised_amount: number | null
           status: Database["public"]["Enums"]["investment_status"] | null
+          structure_fee: number | null
+          success_fee: number | null
           target_amount: number
+          targeted_avg_coc: number | null
+          targeted_irr: number | null
+          tax_adjusted_cg: number | null
+          tax_adjusted_em: number | null
+          tax_fee_adjusted_coc: number | null
+          tax_fee_adjusted_irr: number | null
           title: string
           updated_at: string
         }
         Insert: {
+          address?: string | null
+          base_fee?: number | null
+          capital_gain_success_fee?: number | null
           closing_date?: string | null
+          coc_year_1?: number | null
+          coc_year_2?: number | null
+          coc_year_3?: number | null
+          coc_year_4?: number | null
+          coc_year_5?: number | null
+          coc_year_6?: number | null
+          coc_year_7?: number | null
           created_at?: string
           created_by: string
           description?: string | null
+          disregard_user_levels?: boolean | null
+          distribution_overview?: string | null
+          enable_source_wealth_screen?: boolean | null
           expected_return?: string | null
           id?: string
           image_url?: string | null
           investment_term?: string | null
           investment_type: string
+          lister_name?: string | null
           location?: string | null
+          marketing_sales_fee?: number | null
           maximum_investment?: number | null
           minimum_investment: number
+          other_published?: boolean | null
+          product_name?: string | null
+          published_private_wealth?: boolean | null
+          published_wealth_migrate?: boolean | null
           raised_amount?: number | null
           status?: Database["public"]["Enums"]["investment_status"] | null
+          structure_fee?: number | null
+          success_fee?: number | null
           target_amount: number
+          targeted_avg_coc?: number | null
+          targeted_irr?: number | null
+          tax_adjusted_cg?: number | null
+          tax_adjusted_em?: number | null
+          tax_fee_adjusted_coc?: number | null
+          tax_fee_adjusted_irr?: number | null
           title: string
           updated_at?: string
         }
         Update: {
+          address?: string | null
+          base_fee?: number | null
+          capital_gain_success_fee?: number | null
           closing_date?: string | null
+          coc_year_1?: number | null
+          coc_year_2?: number | null
+          coc_year_3?: number | null
+          coc_year_4?: number | null
+          coc_year_5?: number | null
+          coc_year_6?: number | null
+          coc_year_7?: number | null
           created_at?: string
           created_by?: string
           description?: string | null
+          disregard_user_levels?: boolean | null
+          distribution_overview?: string | null
+          enable_source_wealth_screen?: boolean | null
           expected_return?: string | null
           id?: string
           image_url?: string | null
           investment_term?: string | null
           investment_type?: string
+          lister_name?: string | null
           location?: string | null
+          marketing_sales_fee?: number | null
           maximum_investment?: number | null
           minimum_investment?: number
+          other_published?: boolean | null
+          product_name?: string | null
+          published_private_wealth?: boolean | null
+          published_wealth_migrate?: boolean | null
           raised_amount?: number | null
           status?: Database["public"]["Enums"]["investment_status"] | null
+          structure_fee?: number | null
+          success_fee?: number | null
           target_amount?: number
+          targeted_avg_coc?: number | null
+          targeted_irr?: number | null
+          tax_adjusted_cg?: number | null
+          tax_adjusted_em?: number | null
+          tax_fee_adjusted_coc?: number | null
+          tax_fee_adjusted_irr?: number | null
           title?: string
           updated_at?: string
         }
@@ -205,6 +286,150 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "investment_updates_offering_id_fkey"
+            columns: ["offering_id"]
+            isOneToOne: false
+            referencedRelation: "investment_offerings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      offering_documents: {
+        Row: {
+          created_at: string
+          description: string | null
+          document_category: string
+          file_name: string
+          file_path: string
+          file_size: number | null
+          id: string
+          is_required: boolean | null
+          mime_type: string | null
+          offering_id: string
+          title: string
+          updated_at: string
+          uploaded_by: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          document_category: string
+          file_name: string
+          file_path: string
+          file_size?: number | null
+          id?: string
+          is_required?: boolean | null
+          mime_type?: string | null
+          offering_id: string
+          title: string
+          updated_at?: string
+          uploaded_by: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          document_category?: string
+          file_name?: string
+          file_path?: string
+          file_size?: number | null
+          id?: string
+          is_required?: boolean | null
+          mime_type?: string | null
+          offering_id?: string
+          title?: string
+          updated_at?: string
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "offering_documents_offering_id_fkey"
+            columns: ["offering_id"]
+            isOneToOne: false
+            referencedRelation: "investment_offerings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      offering_media: {
+        Row: {
+          created_at: string
+          display_order: number | null
+          file_name: string | null
+          file_path: string | null
+          file_size: number | null
+          id: string
+          media_type: string
+          mime_type: string | null
+          offering_id: string
+          updated_at: string
+          url: string | null
+        }
+        Insert: {
+          created_at?: string
+          display_order?: number | null
+          file_name?: string | null
+          file_path?: string | null
+          file_size?: number | null
+          id?: string
+          media_type: string
+          mime_type?: string | null
+          offering_id: string
+          updated_at?: string
+          url?: string | null
+        }
+        Update: {
+          created_at?: string
+          display_order?: number | null
+          file_name?: string | null
+          file_path?: string | null
+          file_size?: number | null
+          id?: string
+          media_type?: string
+          mime_type?: string | null
+          offering_id?: string
+          updated_at?: string
+          url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "offering_media_offering_id_fkey"
+            columns: ["offering_id"]
+            isOneToOne: false
+            referencedRelation: "investment_offerings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      offering_milestones: {
+        Row: {
+          created_at: string
+          description: string
+          id: string
+          milestone_date: string
+          milestone_order: number
+          offering_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          id?: string
+          milestone_date: string
+          milestone_order: number
+          offering_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          milestone_date?: string
+          milestone_order?: number
+          offering_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "offering_milestones_offering_id_fkey"
             columns: ["offering_id"]
             isOneToOne: false
             referencedRelation: "investment_offerings"
