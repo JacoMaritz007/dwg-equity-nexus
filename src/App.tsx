@@ -13,6 +13,7 @@ import { UpdatesPage } from "@/pages/UpdatesPage";
 import { TransactionsPage } from "@/pages/TransactionsPage";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { AuthorizedRoute } from "@/components/auth/AuthorizedRoute";
+import { AccountStatusPage } from "@/pages/AccountStatusPage";
 import AdminDashboard from "@/pages/admin/AdminDashboard";
 import OfferingsManagement from "@/pages/admin/OfferingsManagement";
 import CreateOffering from "@/pages/admin/CreateOffering";
@@ -137,6 +138,15 @@ const App = () => (
                       <h1 className="text-3xl font-bold">Email Preferences</h1>
                       <p className="text-muted-foreground mt-2">Coming soon...</p>
                     </div>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/account-status"
+                element={
+                  <ProtectedRoute>
+                    <Navigation />
+                    <AccountStatusPage />
                   </ProtectedRoute>
                 }
               />
