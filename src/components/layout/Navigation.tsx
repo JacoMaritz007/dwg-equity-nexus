@@ -85,9 +85,9 @@ export const Navigation: React.FC = () => {
         {/* Logo */}
         <Link to="/dashboard" className="flex items-center gap-2">
           <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center">
-            <span className="text-sm font-bold text-primary-foreground">DWG</span>
+            <span className="text-sm font-bold text-primary-foreground">GS</span>
           </div>
-          <span className="hidden sm:block font-bold text-lg">Capital Partners</span>
+          <span className="hidden sm:block font-bold text-lg">Gainscape</span>
         </Link>
 
         {/* Desktop Navigation */}

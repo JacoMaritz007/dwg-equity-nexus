@@ -103,7 +103,7 @@ const AdminDashboard: React.FC = () => {
       <div className="mb-8">
         <h1 className="text-3xl font-bold">Admin Dashboard</h1>
         <p className="text-muted-foreground mt-2">
-          Manage your investment platform and track key metrics
+          Manage your Gainscape platform and track key metrics
         </p>
       </div>
 

@@ -123,9 +123,9 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onShowLogin }) => {
     <Card className="w-full max-w-2xl mx-auto">
       <CardHeader className="text-center">
         <div className="w-16 h-16 bg-gradient-primary rounded-lg flex items-center justify-center mx-auto mb-4">
-          <span className="text-2xl font-bold text-primary-foreground">DWG</span>
+          <span className="text-2xl font-bold text-primary-foreground">GS</span>
         </div>
-        <CardTitle className="text-2xl font-bold">Join Capital Partners</CardTitle>
+        <CardTitle className="text-2xl font-bold">Join Gainscape</CardTitle>
         <CardDescription>
           Create your investment account to access exclusive opportunities
         </CardDescription>

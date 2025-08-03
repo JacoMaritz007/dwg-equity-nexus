@@ -64,11 +64,11 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onShowRegister, onShowForg
     <Card className="w-full max-w-md mx-auto">
       <CardHeader className="text-center">
         <div className="w-16 h-16 bg-gradient-primary rounded-lg flex items-center justify-center mx-auto mb-4">
-          <span className="text-2xl font-bold text-primary-foreground">DWG</span>
+          <span className="text-2xl font-bold text-primary-foreground">GS</span>
         </div>
         <CardTitle className="text-2xl font-bold">Welcome Back</CardTitle>
         <CardDescription>
-          Sign in to your Capital Partners account
+          Sign in to your Gainscape account
         </CardDescription>
       </CardHeader>
 
