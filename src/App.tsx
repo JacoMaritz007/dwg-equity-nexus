@@ -14,6 +14,7 @@ import { TransactionsPage } from "@/pages/TransactionsPage";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { AuthorizedRoute } from "@/components/auth/AuthorizedRoute";
 import { AccountStatusPage } from "@/pages/AccountStatusPage";
+import { DocumentsPage } from "@/pages/DocumentsPage";
 import AdminDashboard from "@/pages/admin/AdminDashboard";
 import OfferingsManagement from "@/pages/admin/OfferingsManagement";
 import CreateOffering from "@/pages/admin/CreateOffering";
@@ -85,11 +86,7 @@ const App = () => (
                 path="/documents"
                 element={
                   <ProtectedRoute>
-                    <Navigation />
-                    <div className="container mx-auto p-6">
-                      <h1 className="text-3xl font-bold">Documents</h1>
-                      <p className="text-muted-foreground mt-2">Coming soon...</p>
-                    </div>
+                    <DocumentsPage />
                   </ProtectedRoute>
                 }
               />
