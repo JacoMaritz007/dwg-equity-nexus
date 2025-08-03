@@ -115,33 +115,49 @@ export const AccountStatusPage: React.FC = () => {
     try {
       const { data: profile, error } = await supabase
         .from('profiles')
-        .select('*')
+        .select(`
+          is_accredited,
+          kyc_verified,
+          verification_status,
+          investor_classification,
+          is_pep,
+          pep_screening_date,
+          sanctions_screening_date,
+          sanctions_clear
+        `)
         .eq('id', user.id)
         .single();
 
       if (error) throw error;
 
+      // Calculate verification status based on existing data
+      const identity_verified = profile.verification_status === 'approved';
+      const address_verified = profile.verification_status === 'approved';
+      const financial_verified = profile.verification_status === 'approved' && profile.is_accredited;
+      const pep_screened = profile.pep_screening_date !== null;
+      const sanctions_screened = profile.sanctions_screening_date !== null;
+
       // Calculate overall progress
       const verifications = [
-        profile.identity_verified,
-        profile.address_verified,
-        profile.financial_verified,
-        profile.pep_screened,
-        profile.sanctions_screened
+        identity_verified,
+        address_verified,
+        financial_verified,
+        pep_screened,
+        sanctions_screened
       ];
       
       const completedCount = verifications.filter(Boolean).length;
       const overall_progress = Math.round((completedCount / verifications.length) * 100);
 
       setVerificationStatus({
-        identity_verified: profile.identity_verified || false,
-        address_verified: profile.address_verified || false,
-        financial_verified: profile.financial_verified || false,
-        pep_screened: profile.pep_screened || false,
-        sanctions_screened: profile.sanctions_screened || false,
+        identity_verified,
+        address_verified,
+        financial_verified,
+        pep_screened,
+        sanctions_screened,
         kyc_completed: profile.kyc_verified || false,
         investor_classification: profile.investor_classification,
-        verification_level: profile.verification_level,
+        verification_level: profile.investor_classification === 'high_net_worth' || profile.investor_classification === 'sophisticated' ? 'enhanced' : 'basic',
         overall_progress
       });
     } catch (error) {

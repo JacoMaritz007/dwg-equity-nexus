@@ -440,53 +440,143 @@ export type Database = {
       profiles: {
         Row: {
           address: string | null
+          address_verified: boolean | null
+          annual_income: number | null
           city: string | null
+          compliance_notes: string | null
           country: string | null
           created_at: string
           date_of_birth: string | null
           email: string | null
+          employer: string | null
+          financial_verified: boolean | null
           first_name: string | null
           id: string
+          identity_verified: boolean | null
+          investor_classification:
+            | Database["public"]["Enums"]["investor_classification"]
+            | null
           is_accredited: boolean | null
+          is_pep: boolean | null
           kyc_verified: boolean | null
           last_name: string | null
+          nationality: string | null
+          net_worth: number | null
+          next_review_date: string | null
+          occupation: string | null
+          pep_details: string | null
+          pep_screened: boolean | null
+          pep_screening_date: string | null
           phone: string | null
+          place_of_birth: string | null
+          risk_rating: Database["public"]["Enums"]["risk_rating"] | null
+          sanctions_clear: boolean | null
+          sanctions_screened: boolean | null
+          sanctions_screening_date: string | null
+          source_of_wealth:
+            | Database["public"]["Enums"]["source_of_wealth"][]
+            | null
           state: string | null
           updated_at: string
+          verification_completed_at: string | null
+          verification_level: string | null
+          verification_status:
+            | Database["public"]["Enums"]["verification_status"]
+            | null
           zip_code: string | null
         }
         Insert: {
           address?: string | null
+          address_verified?: boolean | null
+          annual_income?: number | null
           city?: string | null
+          compliance_notes?: string | null
           country?: string | null
           created_at?: string
           date_of_birth?: string | null
           email?: string | null
+          employer?: string | null
+          financial_verified?: boolean | null
           first_name?: string | null
           id: string
+          identity_verified?: boolean | null
+          investor_classification?:
+            | Database["public"]["Enums"]["investor_classification"]
+            | null
           is_accredited?: boolean | null
+          is_pep?: boolean | null
           kyc_verified?: boolean | null
           last_name?: string | null
+          nationality?: string | null
+          net_worth?: number | null
+          next_review_date?: string | null
+          occupation?: string | null
+          pep_details?: string | null
+          pep_screened?: boolean | null
+          pep_screening_date?: string | null
           phone?: string | null
+          place_of_birth?: string | null
+          risk_rating?: Database["public"]["Enums"]["risk_rating"] | null
+          sanctions_clear?: boolean | null
+          sanctions_screened?: boolean | null
+          sanctions_screening_date?: string | null
+          source_of_wealth?:
+            | Database["public"]["Enums"]["source_of_wealth"][]
+            | null
           state?: string | null
           updated_at?: string
+          verification_completed_at?: string | null
+          verification_level?: string | null
+          verification_status?:
+            | Database["public"]["Enums"]["verification_status"]
+            | null
           zip_code?: string | null
         }
         Update: {
           address?: string | null
+          address_verified?: boolean | null
+          annual_income?: number | null
           city?: string | null
+          compliance_notes?: string | null
           country?: string | null
           created_at?: string
           date_of_birth?: string | null
           email?: string | null
+          employer?: string | null
+          financial_verified?: boolean | null
           first_name?: string | null
           id?: string
+          identity_verified?: boolean | null
+          investor_classification?:
+            | Database["public"]["Enums"]["investor_classification"]
+            | null
           is_accredited?: boolean | null
+          is_pep?: boolean | null
           kyc_verified?: boolean | null
           last_name?: string | null
+          nationality?: string | null
+          net_worth?: number | null
+          next_review_date?: string | null
+          occupation?: string | null
+          pep_details?: string | null
+          pep_screened?: boolean | null
+          pep_screening_date?: string | null
           phone?: string | null
+          place_of_birth?: string | null
+          risk_rating?: Database["public"]["Enums"]["risk_rating"] | null
+          sanctions_clear?: boolean | null
+          sanctions_screened?: boolean | null
+          sanctions_screening_date?: string | null
+          source_of_wealth?:
+            | Database["public"]["Enums"]["source_of_wealth"][]
+            | null
           state?: string | null
           updated_at?: string
+          verification_completed_at?: string | null
+          verification_level?: string | null
+          verification_status?:
+            | Database["public"]["Enums"]["verification_status"]
+            | null
           zip_code?: string | null
         }
         Relationships: []
@@ -600,6 +690,111 @@ export type Database = {
         }
         Relationships: []
       }
+      verification_documents: {
+        Row: {
+          created_at: string
+          document_type: Database["public"]["Enums"]["verification_document_type"]
+          expiry_date: string | null
+          file_name: string
+          file_path: string
+          file_size: number | null
+          id: string
+          is_expired: boolean | null
+          mime_type: string | null
+          reviewed_at: string | null
+          reviewer_id: string | null
+          reviewer_notes: string | null
+          title: string
+          updated_at: string
+          user_id: string
+          verification_status:
+            | Database["public"]["Enums"]["verification_status"]
+            | null
+        }
+        Insert: {
+          created_at?: string
+          document_type: Database["public"]["Enums"]["verification_document_type"]
+          expiry_date?: string | null
+          file_name: string
+          file_path: string
+          file_size?: number | null
+          id?: string
+          is_expired?: boolean | null
+          mime_type?: string | null
+          reviewed_at?: string | null
+          reviewer_id?: string | null
+          reviewer_notes?: string | null
+          title: string
+          updated_at?: string
+          user_id: string
+          verification_status?:
+            | Database["public"]["Enums"]["verification_status"]
+            | null
+        }
+        Update: {
+          created_at?: string
+          document_type?: Database["public"]["Enums"]["verification_document_type"]
+          expiry_date?: string | null
+          file_name?: string
+          file_path?: string
+          file_size?: number | null
+          id?: string
+          is_expired?: boolean | null
+          mime_type?: string | null
+          reviewed_at?: string | null
+          reviewer_id?: string | null
+          reviewer_notes?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+          verification_status?:
+            | Database["public"]["Enums"]["verification_status"]
+            | null
+        }
+        Relationships: []
+      }
+      verification_history: {
+        Row: {
+          change_reason: string | null
+          changed_by: string
+          created_at: string
+          document_id: string | null
+          id: string
+          new_status: Database["public"]["Enums"]["verification_status"]
+          notes: string | null
+          previous_status:
+            | Database["public"]["Enums"]["verification_status"]
+            | null
+          user_id: string
+        }
+        Insert: {
+          change_reason?: string | null
+          changed_by: string
+          created_at?: string
+          document_id?: string | null
+          id?: string
+          new_status: Database["public"]["Enums"]["verification_status"]
+          notes?: string | null
+          previous_status?:
+            | Database["public"]["Enums"]["verification_status"]
+            | null
+          user_id: string
+        }
+        Update: {
+          change_reason?: string | null
+          changed_by?: string
+          created_at?: string
+          document_id?: string | null
+          id?: string
+          new_status?: Database["public"]["Enums"]["verification_status"]
+          notes?: string | null
+          previous_status?:
+            | Database["public"]["Enums"]["verification_status"]
+            | null
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -627,7 +822,39 @@ export type Database = {
         | "tax_document"
         | "update"
       investment_status: "draft" | "active" | "closed" | "cancelled"
+      investor_classification:
+        | "retail"
+        | "sophisticated"
+        | "high_net_worth"
+        | "institutional"
+      risk_rating: "low" | "medium" | "high"
+      source_of_wealth:
+        | "employment"
+        | "business_ownership"
+        | "inheritance"
+        | "property_sale"
+        | "investment_gains"
+        | "pension"
+        | "gift"
+        | "other"
       transaction_type: "contribution" | "distribution" | "fee" | "expense"
+      verification_document_type:
+        | "passport"
+        | "national_id"
+        | "driving_license"
+        | "proof_of_address"
+        | "bank_statement"
+        | "income_verification"
+        | "source_of_wealth"
+        | "pep_declaration"
+        | "sophisticated_investor_cert"
+        | "professional_qualification"
+      verification_status:
+        | "pending"
+        | "in_progress"
+        | "approved"
+        | "rejected"
+        | "expired"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -765,7 +992,43 @@ export const Constants = {
         "update",
       ],
       investment_status: ["draft", "active", "closed", "cancelled"],
+      investor_classification: [
+        "retail",
+        "sophisticated",
+        "high_net_worth",
+        "institutional",
+      ],
+      risk_rating: ["low", "medium", "high"],
+      source_of_wealth: [
+        "employment",
+        "business_ownership",
+        "inheritance",
+        "property_sale",
+        "investment_gains",
+        "pension",
+        "gift",
+        "other",
+      ],
       transaction_type: ["contribution", "distribution", "fee", "expense"],
+      verification_document_type: [
+        "passport",
+        "national_id",
+        "driving_license",
+        "proof_of_address",
+        "bank_statement",
+        "income_verification",
+        "source_of_wealth",
+        "pep_declaration",
+        "sophisticated_investor_cert",
+        "professional_qualification",
+      ],
+      verification_status: [
+        "pending",
+        "in_progress",
+        "approved",
+        "rejected",
+        "expired",
+      ],
     },
   },
 } as const

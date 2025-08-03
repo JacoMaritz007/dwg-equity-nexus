@@ -121,17 +121,31 @@ export const DashboardPage: React.FC = () => {
     try {
       const { data: profile, error } = await supabase
         .from('profiles')
-        .select('identity_verified, address_verified, financial_verified, kyc_verified')
+        .select(`
+          is_accredited,
+          kyc_verified,
+          verification_status,
+          investor_classification,
+          is_pep,
+          pep_screening_date,
+          sanctions_screening_date
+        `)
         .eq('id', user.id)
         .single();
 
       if (error) throw error;
 
+      // Calculate verification status based on existing data
+      const identityVerified = profile?.verification_status === 'approved';
+      const addressVerified = profile?.verification_status === 'approved';
+      const financialVerified = profile?.verification_status === 'approved' && profile?.is_accredited;
+      const kycCompleted = profile?.kyc_verified || false;
+
       const verifications = [
-        profile?.identity_verified,
-        profile?.address_verified,
-        profile?.financial_verified,
-        profile?.kyc_verified
+        identityVerified,
+        addressVerified,
+        financialVerified,
+        kycCompleted
       ];
       
       const completedCount = verifications.filter(Boolean).length;
@@ -139,10 +153,10 @@ export const DashboardPage: React.FC = () => {
 
       setVerificationData({
         overallProgress,
-        identityVerified: profile?.identity_verified || false,
-        addressVerified: profile?.address_verified || false,
-        financialVerified: profile?.financial_verified || false,
-        kycCompleted: profile?.kyc_verified || false,
+        identityVerified,
+        addressVerified,
+        financialVerified,
+        kycCompleted,
       });
     } catch (error) {
       console.error('Error fetching verification status:', error);
