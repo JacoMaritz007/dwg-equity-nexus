@@ -13,6 +13,8 @@ import { Upload, X, FileText, CheckCircle } from 'lucide-react';
 
 interface DocumentUploaderProps {
   onSuccess?: () => void;
+  preselectedCategory?: 'identity' | 'address' | 'financial';
+  allowedDocumentTypes?: string[];
 }
 
 interface UploadingFile {
@@ -22,7 +24,11 @@ interface UploadingFile {
   error?: string;
 }
 
-export const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onSuccess }) => {
+export const DocumentUploader: React.FC<DocumentUploaderProps> = ({ 
+  onSuccess, 
+  preselectedCategory,
+  allowedDocumentTypes 
+}) => {
   const { user } = useAuth();
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([]);
@@ -31,7 +37,7 @@ export const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onSuccess })
   const [description, setDescription] = useState('');
   const [isUploading, setIsUploading] = useState(false);
 
-  const documentTypes = [
+  const allDocumentTypes = [
     { value: 'passport', label: 'Passport' },
     { value: 'driving_license', label: 'Driver\'s License' },
     { value: 'national_id', label: 'National ID' },
@@ -43,6 +49,17 @@ export const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onSuccess })
     { value: 'sophisticated_investor_cert', label: 'Sophisticated Investor Certificate' },
     { value: 'professional_qualification', label: 'Professional Qualification' }
   ];
+
+  const documentTypes = allowedDocumentTypes 
+    ? allDocumentTypes.filter(type => allowedDocumentTypes.includes(type.value))
+    : allDocumentTypes;
+
+  // Auto-select document type if only one is allowed
+  React.useEffect(() => {
+    if (allowedDocumentTypes && allowedDocumentTypes.length === 1 && !documentType) {
+      setDocumentType(allowedDocumentTypes[0]);
+    }
+  }, [allowedDocumentTypes, documentType]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);

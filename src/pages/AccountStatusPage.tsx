@@ -20,6 +20,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { DocumentUploadModal } from '@/components/documents/DocumentUploadModal';
 
 interface VerificationStatus {
   identity_verified: boolean;
@@ -104,6 +105,8 @@ export const AccountStatusPage: React.FC = () => {
   const { user } = useAuth();
   const [verificationStatus, setVerificationStatus] = useState<VerificationStatus | null>(null);
   const [loading, setLoading] = useState(true);
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [selectedDocumentCategory, setSelectedDocumentCategory] = useState<'identity' | 'address' | 'financial' | undefined>();
 
   useEffect(() => {
     fetchVerificationStatus();
@@ -170,6 +173,16 @@ export const AccountStatusPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleUploadClick = (category: 'identity' | 'address' | 'financial') => {
+    setSelectedDocumentCategory(category);
+    setUploadModalOpen(true);
+  };
+
+  const handleUploadSuccess = () => {
+    // Refresh verification status after successful upload
+    fetchVerificationStatus();
   };
 
   if (loading) {
@@ -247,7 +260,11 @@ export const AccountStatusPage: React.FC = () => {
           icon={<User className="h-5 w-5" />}
           action={
             !verificationStatus?.identity_verified && (
-              <Button size="sm" className="w-full">
+              <Button 
+                size="sm" 
+                className="w-full"
+                onClick={() => handleUploadClick('identity')}
+              >
                 <Upload className="h-4 w-4 mr-2" />
                 Upload ID Document
               </Button>
@@ -263,7 +280,12 @@ export const AccountStatusPage: React.FC = () => {
           icon={<MapPin className="h-5 w-5" />}
           action={
             !verificationStatus?.address_verified && (
-              <Button size="sm" variant="outline" className="w-full">
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="w-full"
+                onClick={() => handleUploadClick('address')}
+              >
                 <Upload className="h-4 w-4 mr-2" />
                 Upload Proof of Address
               </Button>
@@ -279,7 +301,12 @@ export const AccountStatusPage: React.FC = () => {
           icon={<CreditCard className="h-5 w-5" />}
           action={
             !verificationStatus?.financial_verified && (
-              <Button size="sm" variant="outline" className="w-full">
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="w-full"
+                onClick={() => handleUploadClick('financial')}
+              >
                 <FileText className="h-4 w-4 mr-2" />
                 Complete Financial Profile
               </Button>
@@ -389,6 +416,14 @@ export const AccountStatusPage: React.FC = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Document Upload Modal */}
+      <DocumentUploadModal
+        isOpen={uploadModalOpen}
+        onClose={() => setUploadModalOpen(false)}
+        documentCategory={selectedDocumentCategory}
+        onSuccess={handleUploadSuccess}
+      />
     </div>
   );
 };
