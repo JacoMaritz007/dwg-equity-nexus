@@ -12,6 +12,7 @@ export interface User {
   profilesCount?: number;
   lastLoginAt?: string;
   role?: 'investor' | 'admin' | 'viewer';
+  roles?: string[];
   permissions?: string[];
 }
 
@@ -60,37 +61,92 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [rolesLoading, setRolesLoading] = useState(false);
   const navigate = useNavigate();
+
+  // Fetch user roles from database
+  const fetchUserRoles = async (userId: string): Promise<string[]> => {
+    try {
+      const { data, error } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId);
+      
+      if (error) {
+        console.error('Error fetching user roles:', error);
+        return [];
+      }
+      
+      return data?.map(item => item.role) || [];
+    } catch (error) {
+      console.error('Error fetching user roles:', error);
+      return [];
+    }
+  };
 
   useEffect(() => {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setSession(session);
-        setUser(session?.user ? {
-          id: session.user.id,
-          email: session.user.email || '',
-          firstName: session.user.user_metadata?.firstName,
-          lastName: session.user.user_metadata?.lastName,
-          role: session.user.user_metadata?.role || 'investor',
-          permissions: session.user.user_metadata?.permissions || []
-        } : null);
-        setLoading(false);
+        
+        if (session?.user) {
+          const baseUser = {
+            id: session.user.id,
+            email: session.user.email || '',
+            firstName: session.user.user_metadata?.firstName,
+            lastName: session.user.user_metadata?.lastName,
+            role: session.user.user_metadata?.role || 'investor',
+            permissions: session.user.user_metadata?.permissions || [],
+            roles: []
+          };
+          
+          setUser(baseUser);
+          setLoading(false);
+          
+          // Fetch roles from database using setTimeout to prevent deadlock
+          setTimeout(() => {
+            setRolesLoading(true);
+            fetchUserRoles(session.user.id).then(roles => {
+              setUser(prev => prev ? { ...prev, roles } : null);
+              setRolesLoading(false);
+            });
+          }, 0);
+        } else {
+          setUser(null);
+          setLoading(false);
+        }
       }
     );
 
     // Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      setUser(session?.user ? {
-        id: session.user.id,
-        email: session.user.email || '',
-        firstName: session.user.user_metadata?.firstName,
-        lastName: session.user.user_metadata?.lastName,
-        role: session.user.user_metadata?.role || 'investor',
-        permissions: session.user.user_metadata?.permissions || []
-      } : null);
-      setLoading(false);
+      
+      if (session?.user) {
+        const baseUser = {
+          id: session.user.id,
+          email: session.user.email || '',
+          firstName: session.user.user_metadata?.firstName,
+          lastName: session.user.user_metadata?.lastName,
+          role: session.user.user_metadata?.role || 'investor',
+          permissions: session.user.user_metadata?.permissions || [],
+          roles: []
+        };
+        
+        setUser(baseUser);
+        setLoading(false);
+        
+        // Fetch roles from database
+        setRolesLoading(true);
+        fetchUserRoles(session.user.id).then(roles => {
+          setUser(prev => prev ? { ...prev, roles } : null);
+          setRolesLoading(false);
+        });
+      } else {
+        setUser(null);
+        setLoading(false);
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -225,14 +281,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const hasRole = (role: string): boolean => {
-    return user?.role === role;
+    // Check both metadata role and database roles
+    return user?.role === role || user?.roles?.includes(role) || false;
   };
 
   const canAccess = (resource: string, action: string = 'read'): boolean => {
     if (!user) return false;
     
-    // Admin can access everything
-    if (user.role === 'admin') return true;
+    // Admin can access everything (check both sources)
+    if (user.role === 'admin' || user.roles?.includes('admin')) return true;
     
     // Check specific permissions
     const permission = `${resource}:${action}`;
