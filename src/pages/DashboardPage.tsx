@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { VerificationStatusCard } from '@/components/verification/VerificationStatusCard';
 import { 
   TrendingUp, 
   DollarSign, 
@@ -100,6 +102,54 @@ const upcomingOpportunities = [
 
 export const DashboardPage: React.FC = () => {
   const { user } = useAuth();
+  const [verificationData, setVerificationData] = useState({
+    overallProgress: 0,
+    identityVerified: false,
+    addressVerified: false,
+    financialVerified: false,
+    kycCompleted: false,
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchVerificationStatus();
+  }, [user]);
+
+  const fetchVerificationStatus = async () => {
+    if (!user) return;
+
+    try {
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('identity_verified, address_verified, financial_verified, kyc_verified')
+        .eq('id', user.id)
+        .single();
+
+      if (error) throw error;
+
+      const verifications = [
+        profile?.identity_verified,
+        profile?.address_verified,
+        profile?.financial_verified,
+        profile?.kyc_verified
+      ];
+      
+      const completedCount = verifications.filter(Boolean).length;
+      const overallProgress = Math.round((completedCount / verifications.length) * 100);
+
+      setVerificationData({
+        overallProgress,
+        identityVerified: profile?.identity_verified || false,
+        addressVerified: profile?.address_verified || false,
+        financialVerified: profile?.financial_verified || false,
+        kycCompleted: profile?.kyc_verified || false,
+      });
+    } catch (error) {
+      console.error('Error fetching verification status:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="container mx-auto p-6 space-y-8">
@@ -243,56 +293,17 @@ export const DashboardPage: React.FC = () => {
         </Card>
       </div>
 
-      {/* Account Status */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5" />
-            Account Status
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Profile Completion</span>
-                <span className="text-sm text-muted-foreground">85%</span>
-              </div>
-              <Progress value={85} className="h-2" />
-            </div>
-            
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">KYC Verification</span>
-                <Badge variant="default" className="text-xs">Verified</Badge>
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Accredited Status</span>
-                <Badge variant={user?.isAccredited ? 'default' : 'secondary'} className="text-xs">
-                  {user?.isAccredited ? 'Verified' : 'Pending'}
-                </Badge>
-              </div>
-            </div>
-          </div>
-          
-          {!user?.isAccredited && (
-            <div className="mt-4 p-4 bg-warning/10 border border-warning/20 rounded-lg">
-              <div className="flex items-center gap-2">
-                <AlertCircle className="h-4 w-4 text-warning" />
-                <p className="text-sm text-warning font-medium">
-                  Complete your accredited investor verification to access premium opportunities.
-                </p>
-              </div>
-              <Button variant="outline" size="sm" className="mt-2">
-                Complete Verification
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* Account Verification Status */}
+      {!loading && (
+        <VerificationStatusCard
+          overallProgress={verificationData.overallProgress}
+          identityVerified={verificationData.identityVerified}
+          addressVerified={verificationData.addressVerified}
+          financialVerified={verificationData.financialVerified}
+          kycCompleted={verificationData.kycCompleted}
+          isAccredited={user?.isAccredited || false}
+        />
+      )}
     </div>
   );
 };

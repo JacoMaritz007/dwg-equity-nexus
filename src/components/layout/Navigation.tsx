@@ -35,7 +35,8 @@ const navigationItems = [
 
 const profileMenuItems = [
   { href: '/profiles', label: 'Profiles', icon: User },
-  { href: '/account', label: 'Account', icon: Settings },
+  { href: '/account-status', label: 'Account Status', icon: Shield },
+  { href: '/account', label: 'Account Settings', icon: Settings },
   { href: '/sharing', label: 'Sharing', icon: Share2 },
   { href: '/email-preferences', label: 'Email Preferences', icon: Mail },
 ];
