@@ -32,7 +32,7 @@ interface VerificationDocumentWithUser {
 }
 
 const AdminDocuments: React.FC = () => {
-  const { isAdmin } = usePermissions();
+  const { user, hasRole } = usePermissions();
   const { getSignedUrl } = useDocuments();
   const [documents, setDocuments] = useState<VerificationDocumentWithUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,6 +41,11 @@ const AdminDocuments: React.FC = () => {
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [selectedDocument, setSelectedDocument] = useState<VerificationDocumentWithUser | null>(null);
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
+
+  // Memoize admin status to prevent re-renders
+  const isAdmin = useMemo(() => {
+    return hasRole('admin');
+  }, [hasRole]);
 
   const fetchDocuments = useCallback(async () => {
     try {
@@ -96,7 +101,8 @@ const AdminDocuments: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (isAdmin()) {
+    // Only fetch documents when user is admin
+    if (isAdmin) {
       fetchDocuments();
     }
   }, [isAdmin, fetchDocuments]);
@@ -170,7 +176,8 @@ const AdminDocuments: React.FC = () => {
     rejected: documents.filter(d => d.verification_status === 'rejected').length,
   }), [documents]);
 
-  if (!isAdmin()) {
+  // Show access denied if user is not admin
+  if (!isAdmin) {
     return (
       <div className="container mx-auto p-6">
         <div className="text-center">
