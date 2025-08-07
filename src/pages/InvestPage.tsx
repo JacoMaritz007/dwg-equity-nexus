@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -17,116 +18,60 @@ import {
   Eye,
   ArrowRight
 } from 'lucide-react';
+import { useInvestmentOfferings } from '@/hooks/useInvestmentOfferings';
+import { transformOfferingForDisplay } from '@/utils/offeringHelpers';
+import { OfferingDisplayData } from '@/types/investment';
 
-interface InvestmentOffering {
-  id: string;
-  title: string;
-  subtitle: string;
-  type: string;
-  image: string;
-  offeringSize: string;
-  minInvestment: string;
-  targetReturn: string;
-  term: string;
-  status: 'active' | 'past' | 'coming-soon';
-  raisedAmount: number;
-  raisedPercentage: number;
-  closingDate: string;
-  highlights: string[];
-}
-
-const activeOfferings: InvestmentOffering[] = [
-  {
-    id: '1',
-    title: 'Meridian Office Complex',
-    subtitle: 'Premium Commercial Real Estate',
-    type: 'Real Estate',
-    image: '/api/placeholder/400/250',
-    offeringSize: '$5,000,000',
-    minInvestment: '$25,000',
-    targetReturn: '12-15% IRR',
-    term: '3-5 years',
-    status: 'active',
-    raisedAmount: 3200000,
-    raisedPercentage: 64,
-    closingDate: '2024-03-15',
-    highlights: [
-      'Prime downtown location',
-      'Fully leased to Fortune 500 tenants',
-      'Recent $2M renovation completed'
-    ]
-  },
-  {
-    id: '2',
-    title: 'Green Energy Infrastructure Fund',
-    subtitle: 'Renewable Energy Portfolio',
-    type: 'Infrastructure',
-    image: '/api/placeholder/400/250',
-    offeringSize: '$15,000,000',
-    minInvestment: '$50,000',
-    targetReturn: '15-20% IRR',
-    term: '5-7 years',
-    status: 'active',
-    raisedAmount: 8500000,
-    raisedPercentage: 57,
-    closingDate: '2024-04-01',
-    highlights: [
-      'Diversified solar and wind projects',
-      '20-year power purchase agreements',
-      'Government tax incentives included'
-    ]
-  },
-  {
-    id: '3',
-    title: 'Healthcare Innovation Fund III',
-    subtitle: 'Medical Technology Ventures',
-    type: 'Venture Capital',
-    image: '/api/placeholder/400/250',
-    offeringSize: '$25,000,000',
-    minInvestment: '$100,000',
-    targetReturn: '20-30% IRR',
-    term: '5-8 years',
-    status: 'active',
-    raisedAmount: 12000000,
-    raisedPercentage: 48,
-    closingDate: '2024-03-30',
-    highlights: [
-      'Focus on AI-driven medical devices',
-      'Experienced healthcare investment team',
-      'Strategic partnerships with major hospitals'
-    ]
-  }
-];
-
-const pastOfferings: InvestmentOffering[] = [
-  {
-    id: '4',
-    title: 'Luxury Residential Development',
-    subtitle: 'High-End Apartment Complex',
-    type: 'Real Estate',
-    image: '/api/placeholder/400/250',
-    offeringSize: '$8,000,000',
-    minInvestment: '$25,000',
-    targetReturn: '18.5% IRR',
-    term: '4 years',
-    status: 'past',
-    raisedAmount: 8000000,
-    raisedPercentage: 100,
-    closingDate: '2023-06-15',
-    highlights: [
-      'Successfully completed and sold',
-      'Exceeded target returns by 2.5%',
-      'All distributions completed'
-    ]
-  }
-];
 
 export const InvestPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('all');
-  const [sortBy, setSortBy] = useState('closing-date');
+  const [sortBy, setSortBy] = useState('closing_date');
+  const [activeTab, setActiveTab] = useState('active');
+  
+  const { offerings, loading, error, fetchOfferings, getActiveOfferings, getPastOfferings } = useInvestmentOfferings();
+  const [displayOfferings, setDisplayOfferings] = useState<OfferingDisplayData[]>([]);
 
-  const OfferingCard: React.FC<{ offering: InvestmentOffering }> = ({ offering }) => (
+  // Transform offerings for display
+  useEffect(() => {
+    const transformed = offerings.map(transformOfferingForDisplay);
+    setDisplayOfferings(transformed);
+  }, [offerings]);
+
+  // Filter and sort offerings
+  const filteredOfferings = displayOfferings.filter(offering => {
+    const matchesSearch = offering.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         offering.type.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesType = filterType === 'all' || offering.type.toLowerCase().includes(filterType.toLowerCase());
+    const matchesTab = activeTab === 'active' ? offering.status === 'active' : offering.status === 'past';
+    return matchesSearch && matchesType && matchesTab;
+  });
+
+  // Apply sorting
+  const sortedOfferings = [...filteredOfferings].sort((a, b) => {
+    switch (sortBy) {
+      case 'closing_date':
+        return new Date(b.closingDate).getTime() - new Date(a.closingDate).getTime();
+      case 'target_amount':
+        return parseFloat(b.offeringSize.replace(/[$,]/g, '')) - parseFloat(a.offeringSize.replace(/[$,]/g, ''));
+      case 'minimum_investment':
+        return parseFloat(b.minInvestment.replace(/[$,]/g, '')) - parseFloat(a.minInvestment.replace(/[$,]/g, ''));
+      default:
+        return 0;
+    }
+  });
+
+  // Refetch when filters change
+  useEffect(() => {
+    fetchOfferings({
+      search: searchQuery,
+      type: filterType,
+      status: activeTab,
+      sortBy: sortBy as any,
+    });
+  }, [searchQuery, filterType, activeTab, sortBy, fetchOfferings]);
+
+  const OfferingCard: React.FC<{ offering: OfferingDisplayData }> = ({ offering }) => (
     <Card className="investment-card hover:shadow-lg transition-all duration-300">
       <div className="aspect-video w-full bg-muted rounded-t-lg flex items-center justify-center">
         <Building className="h-12 w-12 text-muted-foreground" />
@@ -207,14 +152,18 @@ export const InvestPage: React.FC = () => {
 
         {/* Actions */}
         <div className="flex gap-2 pt-2">
-          <Button variant="outline" size="sm" className="flex-1">
-            <Eye className="mr-2 h-4 w-4" />
-            View Details
+          <Button variant="outline" size="sm" className="flex-1" asChild>
+            <Link to={`/invest/offerings/${offering.id}`}>
+              <Eye className="mr-2 h-4 w-4" />
+              View Details
+            </Link>
           </Button>
           {offering.status === 'active' && (
-            <Button size="sm" className="flex-1 financial-button">
-              Invest Now
-              <ArrowRight className="ml-2 h-4 w-4" />
+            <Button size="sm" className="flex-1 financial-button" asChild>
+              <Link to={`/invest/offerings/${offering.id}`}>
+                Invest Now
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
             </Button>
           )}
         </div>
@@ -280,30 +229,78 @@ export const InvestPage: React.FC = () => {
       {/* Offerings Tabs */}
       <Tabs defaultValue="active" className="space-y-6">
         <TabsList className="grid w-full grid-cols-2 lg:w-400">
-          <TabsTrigger value="active" className="flex items-center gap-2">
+          <TabsTrigger 
+            value="active" 
+            className="flex items-center gap-2"
+            onClick={() => setActiveTab('active')}
+          >
             <TrendingUp className="h-4 w-4" />
             Active Offerings
           </TabsTrigger>
-          <TabsTrigger value="past" className="flex items-center gap-2">
+          <TabsTrigger 
+            value="past" 
+            className="flex items-center gap-2"
+            onClick={() => setActiveTab('past')}
+          >
             <Clock className="h-4 w-4" />
             Past Offerings
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="active">
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {activeOfferings.map((offering) => (
-              <OfferingCard key={offering.id} offering={offering} />
-            ))}
-          </div>
+          {loading ? (
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {[1, 2, 3].map((i) => (
+                <Card key={i} className="animate-pulse">
+                  <div className="aspect-video w-full bg-muted rounded-t-lg" />
+                  <CardContent className="p-6">
+                    <div className="space-y-3">
+                      <div className="h-4 bg-muted rounded w-3/4" />
+                      <div className="h-3 bg-muted rounded w-1/2" />
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="h-8 bg-muted rounded" />
+                        <div className="h-8 bg-muted rounded" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : error ? (
+            <div className="text-center py-8">
+              <p className="text-destructive">{error}</p>
+            </div>
+          ) : (
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {sortedOfferings.map((offering) => (
+                <OfferingCard key={offering.id} offering={offering} />
+              ))}
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="past">
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {pastOfferings.map((offering) => (
-              <OfferingCard key={offering.id} offering={offering} />
-            ))}
-          </div>
+          {loading ? (
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {[1, 2].map((i) => (
+                <Card key={i} className="animate-pulse">
+                  <div className="aspect-video w-full bg-muted rounded-t-lg" />
+                  <CardContent className="p-6">
+                    <div className="space-y-3">
+                      <div className="h-4 bg-muted rounded w-3/4" />
+                      <div className="h-3 bg-muted rounded w-1/2" />
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {sortedOfferings.map((offering) => (
+                <OfferingCard key={offering.id} offering={offering} />
+              ))}
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </div>

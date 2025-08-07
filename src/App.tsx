@@ -20,6 +20,7 @@ import OfferingsManagement from "@/pages/admin/OfferingsManagement";
 import CreateOffering from "@/pages/admin/CreateOffering";
 import UserManagement from "@/pages/admin/UserManagement";
 import AdminDocuments from "@/pages/admin/AdminDocuments";
+import { OfferingDetailsPage } from "@/pages/OfferingDetailsPage";
 
 const queryClient = new QueryClient();
 
@@ -55,9 +56,17 @@ const App = () => (
                     <InvestPage />
                   </ProtectedRoute>
                 }
-              />
-              <Route
-                path="/my-investments"
+               />
+               <Route
+                 path="/invest/offerings/:id"
+                 element={
+                   <ProtectedRoute>
+                     <OfferingDetailsPage />
+                   </ProtectedRoute>
+                 }
+               />
+               <Route
+                 path="/my-investments"
                 element={
                   <ProtectedRoute>
                     <Navigation />
