@@ -113,9 +113,35 @@ export const OfferingDetailsPage: React.FC = () => {
                   src={displayData.image} 
                   alt={offering.title}
                   className="w-full h-full object-cover"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.src = '/api/placeholder/400/250';
+                  }}
                 />
               )}
             </div>
+            
+            {/* Additional Media Gallery */}
+            {offering.offering_media && offering.offering_media.length > 1 && (
+              <div className="mt-4 grid grid-cols-3 gap-2">
+                {offering.offering_media
+                  .filter(media => media.url && media.url !== displayData.image)
+                  .slice(0, 3)
+                  .map((media, index) => (
+                    <div key={media.id} className="aspect-video bg-muted rounded overflow-hidden">
+                      <img 
+                        src={media.url?.startsWith('http') ? media.url : `/api/placeholder/120/80`}
+                        alt={`${offering.title} ${index + 2}`}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.src = '/api/placeholder/120/80';
+                        }}
+                      />
+                    </div>
+                  ))}
+              </div>
+            )}
           </div>
 
           {/* Key Information */}
@@ -265,24 +291,39 @@ export const OfferingDetailsPage: React.FC = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {offering.offering_documents && offering.offering_documents.length > 0 ? (
-                  <div className="space-y-3">
-                    {offering.offering_documents.map((doc) => (
-                      <div key={doc.id} className="flex items-center justify-between p-3 border rounded-lg">
-                        <div className="flex items-center gap-3">
-                          <FileText className="h-5 w-5 text-muted-foreground" />
-                          <div>
-                            <p className="font-medium">{doc.title}</p>
-                            <p className="text-sm text-muted-foreground">{doc.description}</p>
+                 {offering.offering_documents && offering.offering_documents.length > 0 ? (
+                   <div className="space-y-3">
+                     {offering.offering_documents.map((doc) => (
+                       <div key={doc.id} className="flex items-center justify-between p-3 border rounded-lg">
+                         <div className="flex items-center gap-3">
+                           <FileText className="h-5 w-5 text-muted-foreground" />
+                           <div>
+                             <p className="font-medium">{doc.title}</p>
+                             <p className="text-sm text-muted-foreground">{doc.description}</p>
+                              <div className="flex gap-2 mt-1">
+                                <Badge variant="outline" className="text-xs">
+                                  {doc.document_category?.replace('_', ' ').toUpperCase()}
+                                </Badge>
+                                {doc.file_size && (
+                                  <span className="text-xs text-muted-foreground">
+                                    {(doc.file_size / 1024 / 1024).toFixed(1)} MB
+                                  </span>
+                                )}
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                        <Button variant="outline" size="sm">
-                          <Download className="h-4 w-4 mr-2" />
-                          Download
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
+                          <div className="flex gap-2">
+                            <Button variant="outline" size="sm" onClick={() => window.open(doc.file_path, '_blank')}>
+                              View
+                            </Button>
+                           <Button variant="outline" size="sm">
+                             <Download className="h-4 w-4 mr-2" />
+                             Download
+                           </Button>
+                         </div>
+                       </div>
+                     ))}
+                   </div>
                 ) : (
                   <p className="text-muted-foreground text-center py-8">
                     No documents available yet
@@ -302,27 +343,29 @@ export const OfferingDetailsPage: React.FC = () => {
               </CardHeader>
               <CardContent>
                 {offering.offering_milestones && offering.offering_milestones.length > 0 ? (
-                  <div className="space-y-4">
-                    {offering.offering_milestones
-                      .sort((a, b) => new Date(a.milestone_date).getTime() - new Date(b.milestone_date).getTime())
-                      .map((milestone) => (
-                        <div key={milestone.id} className="flex gap-4">
-                          <div className="flex flex-col items-center">
-                            <div className="w-3 h-3 bg-primary rounded-full"></div>
-                            <div className="w-px h-8 bg-border"></div>
-                          </div>
-                          <div className="flex-1 pb-4">
-                            <div className="flex items-center gap-2 mb-1">
-                              <Calendar className="h-4 w-4 text-muted-foreground" />
-                              <span className="text-sm font-medium">
-                                {new Date(milestone.milestone_date).toLocaleDateString()}
-                              </span>
+                   <div className="space-y-4">
+                     {offering.offering_milestones
+                       .sort((a, b) => new Date(a.milestone_date).getTime() - new Date(b.milestone_date).getTime())
+                       .map((milestone, index, array) => (
+                         <div key={milestone.id} className="flex gap-4">
+                            <div className="flex flex-col items-center">
+                              <div className="w-3 h-3 rounded-full bg-primary"></div>
+                              {index < array.length - 1 && (
+                                <div className="w-px h-8 bg-border mt-2"></div>
+                              )}
                             </div>
-                            <p className="text-muted-foreground">{milestone.description}</p>
-                          </div>
-                        </div>
-                      ))}
-                  </div>
+                            <div className="flex-1 pb-4">
+                              <div className="flex items-center gap-2 mb-1">
+                                <Calendar className="h-4 w-4 text-muted-foreground" />
+                                <span className="text-sm font-medium">
+                                  {new Date(milestone.milestone_date).toLocaleDateString()}
+                                </span>
+                              </div>
+                              <p className="text-muted-foreground">{milestone.description}</p>
+                            </div>
+                         </div>
+                       ))}
+                   </div>
                 ) : (
                   <p className="text-muted-foreground text-center py-8">
                     No timeline information available yet

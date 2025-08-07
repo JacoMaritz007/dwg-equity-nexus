@@ -1,4 +1,17 @@
 import { InvestmentOfferingWithDetails, OfferingDisplayData } from '@/types/investment';
+import { supabase } from '@/integrations/supabase/client';
+
+// Utility function to get Supabase storage public URL
+export const getStorageUrl = (filePath: string): string => {
+  if (!filePath) return '/api/placeholder/400/250';
+  
+  // If it's already a full URL, return as is
+  if (filePath.startsWith('http')) return filePath;
+  
+  // Generate Supabase storage public URL
+  const { data } = supabase.storage.from('offering-media').getPublicUrl(filePath);
+  return data.publicUrl || '/api/placeholder/400/250';
+};
 
 export const transformOfferingForDisplay = (offering: InvestmentOfferingWithDetails): OfferingDisplayData => {
   // Calculate raised percentage
@@ -16,10 +29,33 @@ export const transformOfferingForDisplay = (offering: InvestmentOfferingWithDeta
     }).format(amount);
   };
 
-  // Get primary image from media
-  const primaryImage = offering.offering_media?.find(media => 
-    media.media_type === 'image' && media.display_order === 0
-  )?.url || offering.image_url || '/api/placeholder/400/250';
+  // Get primary image from media - check for featured_image type first
+  let primaryImage = '/api/placeholder/400/250';
+  
+  if (offering.offering_media && offering.offering_media.length > 0) {
+    // Look for featured_image first
+    const featuredImage = offering.offering_media.find(media => 
+      media.media_type === 'featured_image'
+    );
+    
+    if (featuredImage && featuredImage.url) {
+      primaryImage = getStorageUrl(featuredImage.url);
+    } else {
+      // Fallback to first image ordered by display_order
+      const firstImage = offering.offering_media
+        .filter(media => media.media_type === 'image' || media.media_type === 'featured_image')
+        .sort((a, b) => (a.display_order || 0) - (b.display_order || 0))[0];
+      
+      if (firstImage && firstImage.url) {
+        primaryImage = getStorageUrl(firstImage.url);
+      }
+    }
+  }
+  
+  // Fallback to image_url field if available
+  if (primaryImage === '/api/placeholder/400/250' && offering.image_url) {
+    primaryImage = getStorageUrl(offering.image_url);
+  }
 
   // Generate highlights from offering data
   const highlights: string[] = [];
