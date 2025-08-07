@@ -18,6 +18,7 @@ import { DocumentsPage } from "@/pages/DocumentsPage";
 import AdminDashboard from "@/pages/admin/AdminDashboard";
 import OfferingsManagement from "@/pages/admin/OfferingsManagement";
 import CreateOffering from "@/pages/admin/CreateOffering";
+import EditOffering from "@/pages/admin/EditOffering";
 import UserManagement from "@/pages/admin/UserManagement";
 import AdminDocuments from "@/pages/admin/AdminDocuments";
 import { OfferingDetailsPage } from "@/pages/OfferingDetailsPage";
@@ -183,6 +184,15 @@ const App = () => (
                   <AuthorizedRoute requiredRole="admin">
                     <Navigation />
                     <CreateOffering />
+                  </AuthorizedRoute>
+                }
+              />
+              <Route
+                path="/admin/offerings/:id/edit"
+                element={
+                  <AuthorizedRoute requiredRole="admin">
+                    <Navigation />
+                    <EditOffering />
                   </AuthorizedRoute>
                 }
               />

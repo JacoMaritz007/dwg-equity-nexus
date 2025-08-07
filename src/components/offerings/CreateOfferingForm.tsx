@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -17,6 +17,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { FileUploadField } from './FileUploadField';
 import { MilestoneManager, type Milestone } from './MilestoneManager';
+import { InvestmentOfferingWithDetails } from '@/types/investment';
 
 const createOfferingSchema = z.object({
   // Deal Overview
@@ -66,7 +67,15 @@ const createOfferingSchema = z.object({
 
 type CreateOfferingFormData = z.infer<typeof createOfferingSchema>;
 
-export const CreateOfferingForm: React.FC = () => {
+interface CreateOfferingFormProps {
+  offering?: InvestmentOfferingWithDetails;
+  isEditMode?: boolean;
+}
+
+export const CreateOfferingForm: React.FC<CreateOfferingFormProps> = ({ 
+  offering, 
+  isEditMode = false 
+}) => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
@@ -93,6 +102,7 @@ export const CreateOfferingForm: React.FC = () => {
     handleSubmit,
     watch,
     setValue,
+    reset,
     formState: { errors }
   } = useForm<CreateOfferingFormData>({
     resolver: zodResolver(createOfferingSchema),
@@ -104,6 +114,62 @@ export const CreateOfferingForm: React.FC = () => {
       enable_source_wealth_screen: false,
     }
   });
+
+  // Populate form with existing data in edit mode
+  useEffect(() => {
+    if (isEditMode && offering) {
+      const formData: Partial<CreateOfferingFormData> = {
+        lister_name: offering.lister_name || '',
+        product_name: offering.product_name || '',
+        address: offering.address || '',
+        targeted_irr: offering.targeted_irr || 0,
+        targeted_avg_coc: offering.targeted_avg_coc || 0,
+        distribution_overview: offering.distribution_overview || '',
+        title: offering.title || '',
+        description: offering.description || '',
+        investment_type: offering.investment_type || '',
+        location: offering.location || '',
+        target_amount: offering.target_amount || 0,
+        minimum_investment: offering.minimum_investment || 0,
+        maximum_investment: offering.maximum_investment || undefined,
+        expected_return: offering.expected_return || '',
+        closing_date: offering.closing_date ? new Date(offering.closing_date).toISOString().split('T')[0] : '',
+        tax_fee_adjusted_irr: offering.tax_fee_adjusted_irr || undefined,
+        tax_fee_adjusted_coc: offering.tax_fee_adjusted_coc || undefined,
+        tax_adjusted_em: offering.tax_adjusted_em || undefined,
+        tax_adjusted_cg: offering.tax_adjusted_cg || undefined,
+        coc_year_1: offering.coc_year_1 || undefined,
+        coc_year_2: offering.coc_year_2 || undefined,
+        coc_year_3: offering.coc_year_3 || undefined,
+        coc_year_4: offering.coc_year_4 || undefined,
+        coc_year_5: offering.coc_year_5 || undefined,
+        coc_year_6: offering.coc_year_6 || undefined,
+        coc_year_7: offering.coc_year_7 || undefined,
+        base_fee: offering.base_fee || undefined,
+        structure_fee: offering.structure_fee || undefined,
+        marketing_sales_fee: offering.marketing_sales_fee || undefined,
+        success_fee: offering.success_fee || undefined,
+        capital_gain_success_fee: offering.capital_gain_success_fee || undefined,
+        disregard_user_levels: offering.disregard_user_levels || false,
+        published_wealth_migrate: offering.published_wealth_migrate || false,
+        published_private_wealth: offering.published_private_wealth || false,
+        other_published: offering.other_published || false,
+        enable_source_wealth_screen: offering.enable_source_wealth_screen || false,
+      };
+
+      reset(formData);
+
+      // Populate milestones
+      if (offering.offering_milestones) {
+        const existingMilestones: Milestone[] = offering.offering_milestones.map(m => ({
+          id: m.id,
+          description: m.description,
+          date: m.milestone_date ? new Date(m.milestone_date) : undefined
+        }));
+        setMilestones(existingMilestones);
+      }
+    }
+  }, [isEditMode, offering, reset]);
 
   // Calculate completion progress
   const watchedFields = watch();
@@ -148,7 +214,27 @@ export const CreateOfferingForm: React.FC = () => {
     
     setIsLoading(true);
     try {
-      // Create the offering record with proper field mapping
+      if (isEditMode && offering) {
+        // Update existing offering
+        await updateOffering(data, isDraft);
+      } else {
+        // Create new offering
+        await createOffering(data, isDraft);
+      }
+    } catch (error) {
+      console.error('Error saving offering:', error);
+      toast({
+        title: "Error",
+        description: `Failed to ${isEditMode ? 'update' : 'create'} offering. Please try again.`,
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const createOffering = async (data: CreateOfferingFormData, isDraft = false) => {
+    // Create the offering record with proper field mapping
       const offeringData = {
         // Required fields
         title: data.title,
@@ -303,16 +389,185 @@ export const CreateOfferingForm: React.FC = () => {
       });
 
       navigate('/admin/offerings');
-    } catch (error) {
-      console.error('Error creating offering:', error);
-      toast({
-        title: "Error",
-        description: "Failed to create offering. Please try again.",
-        variant: "destructive"
+  };
+
+  const updateOffering = async (data: CreateOfferingFormData, isDraft = false) => {
+    if (!offering) return;
+
+    // Update the offering record
+    const offeringData = {
+      // Required fields
+      title: data.title,
+      investment_type: data.investment_type,
+      target_amount: data.target_amount,
+      minimum_investment: data.minimum_investment || data.target_amount * 0.01,
+      
+      // Deal Overview fields
+      lister_name: data.lister_name,
+      product_name: data.product_name,
+      address: data.address,
+      targeted_irr: data.targeted_irr,
+      targeted_avg_coc: data.targeted_avg_coc,
+      distribution_overview: data.distribution_overview,
+      
+      // Optional fields
+      description: data.description,
+      location: data.location,
+      maximum_investment: data.maximum_investment,
+      expected_return: data.expected_return,
+      closing_date: data.closing_date ? new Date(data.closing_date).toISOString() : null,
+      
+      // Financial projections
+      tax_fee_adjusted_irr: data.tax_fee_adjusted_irr,
+      tax_fee_adjusted_coc: data.tax_fee_adjusted_coc,
+      tax_adjusted_em: data.tax_adjusted_em,
+      tax_adjusted_cg: data.tax_adjusted_cg,
+      coc_year_1: data.coc_year_1,
+      coc_year_2: data.coc_year_2,
+      coc_year_3: data.coc_year_3,
+      coc_year_4: data.coc_year_4,
+      coc_year_5: data.coc_year_5,
+      coc_year_6: data.coc_year_6,
+      coc_year_7: data.coc_year_7,
+      base_fee: data.base_fee,
+      structure_fee: data.structure_fee,
+      marketing_sales_fee: data.marketing_sales_fee,
+      success_fee: data.success_fee,
+      capital_gain_success_fee: data.capital_gain_success_fee,
+      
+      // Platform settings
+      disregard_user_levels: data.disregard_user_levels,
+      published_wealth_migrate: data.published_wealth_migrate,
+      published_private_wealth: data.published_private_wealth,
+      other_published: data.other_published,
+      enable_source_wealth_screen: data.enable_source_wealth_screen,
+      
+      // System fields
+      status: (isDraft ? 'draft' : offering.status || 'active') as 'draft' | 'active' | 'closed' | 'cancelled',
+      updated_at: new Date().toISOString(),
+    };
+
+    const { error: offeringError } = await supabase
+      .from('investment_offerings')
+      .update(offeringData)
+      .eq('id', offering.id);
+
+    if (offeringError) throw offeringError;
+
+    // Handle new media uploads (keep existing ones, add new ones)
+    const mediaUploads: Array<{ type: string; file: File; order?: number }> = [];
+    
+    if (listerLogo?.[0]) mediaUploads.push({ type: 'lister_logo', file: listerLogo[0] });
+    if (sponsorLogo?.[0]) mediaUploads.push({ type: 'sponsor_logo', file: sponsorLogo[0] });
+    if (ddProviderLogo?.[0]) mediaUploads.push({ type: 'dd_provider_logo', file: ddProviderLogo[0] });
+    if (featuredImage?.[0]) mediaUploads.push({ type: 'featured_image', file: featuredImage[0] });
+    
+    if (galleryImages) {
+      galleryImages.forEach((file, index) => {
+        mediaUploads.push({ type: 'gallery_image', file, order: index });
       });
-    } finally {
-      setIsLoading(false);
     }
+
+    for (const upload of mediaUploads) {
+      const fileName = `${offering.id}/${upload.type}_${Date.now()}_${upload.file.name}`;
+      const filePath = await uploadFile(upload.file, 'offering-media', fileName);
+      
+      if (filePath) {
+        // Remove existing media of the same type
+        await supabase
+          .from('offering_media')
+          .delete()
+          .eq('offering_id', offering.id)
+          .eq('media_type', upload.type);
+
+        // Add new media
+        await supabase.from('offering_media').insert({
+          offering_id: offering.id,
+          media_type: upload.type,
+          file_path: filePath,
+          file_name: upload.file.name,
+          file_size: upload.file.size,
+          mime_type: upload.file.type,
+          display_order: upload.order || 0
+        });
+      }
+    }
+
+    // Handle new document uploads (add to existing ones)
+    const documentUploads = [
+      { category: 'investment_memorandum', files: investmentMemo, required: true },
+      { category: 'legal_structure', files: legalStructure, required: true },
+      { category: 'due_diligence', files: dueDiligence, required: false },
+      { category: 'financial_model', files: financialModel, required: false },
+      { category: 'other', files: otherDocs, required: false }
+    ];
+
+    for (const docUpload of documentUploads) {
+      if (docUpload.files) {
+        for (const file of docUpload.files) {
+          const fileName = `${offering.id}/${docUpload.category}_${Date.now()}_${file.name}`;
+          const filePath = await uploadFile(file, 'offering-documents', fileName);
+          
+          if (filePath) {
+            await supabase.from('offering_documents').insert({
+              offering_id: offering.id,
+              document_category: docUpload.category,
+              title: file.name,
+              file_path: filePath,
+              file_name: file.name,
+              file_size: file.size,
+              mime_type: file.type,
+              is_required: docUpload.required,
+              uploaded_by: user.id
+            });
+          }
+        }
+      }
+    }
+
+    // Update milestones (remove existing, add new)
+    await supabase
+      .from('offering_milestones')
+      .delete()
+      .eq('offering_id', offering.id);
+
+    if (milestones.length > 0) {
+      const milestoneData = milestones.map((milestone, index) => ({
+        offering_id: offering.id,
+        description: milestone.description,
+        milestone_date: milestone.date?.toISOString().split('T')[0],
+        milestone_order: index + 1
+      }));
+
+      await supabase.from('offering_milestones').insert(milestoneData);
+    }
+
+    // Handle video links
+    if (videoLinks.trim()) {
+      // Remove existing video links
+      await supabase
+        .from('offering_media')
+        .delete()
+        .eq('offering_id', offering.id)
+        .eq('media_type', 'video_link');
+
+      // Add new video links
+      const videoUrls = videoLinks.split('\n').filter(url => url.trim());
+      for (const url of videoUrls) {
+        await supabase.from('offering_media').insert({
+          offering_id: offering.id,
+          media_type: 'video_link',
+          url: url.trim()
+        });
+      }
+    }
+
+    toast({
+      title: isDraft ? "Draft updated successfully" : "Offering updated successfully",
+      description: isDraft ? "Your draft has been saved." : "The investment offering has been updated."
+    });
+
+    navigate('/admin/offerings');
   };
 
   const progress = calculateProgress();
@@ -328,9 +583,14 @@ export const CreateOfferingForm: React.FC = () => {
         </div>
         
         <div className="space-y-2">
-          <h1 className="text-3xl font-bold">Create Investment Offering</h1>
+          <h1 className="text-3xl font-bold">
+            {isEditMode ? 'Edit Investment Offering' : 'Create Investment Offering'}
+          </h1>
           <p className="text-muted-foreground">
-            Create a comprehensive investment opportunity with detailed information, media, and documentation.
+            {isEditMode 
+              ? 'Update the investment opportunity details, media, and documentation.'
+              : 'Create a comprehensive investment opportunity with detailed information, media, and documentation.'
+            }
           </p>
           <div className="flex items-center gap-4">
             <Progress value={progress} className="flex-1" />
@@ -893,13 +1153,16 @@ export const CreateOfferingForm: React.FC = () => {
               disabled={isLoading}
             >
               <Save className="h-4 w-4 mr-2" />
-              Save as Draft
+              {isEditMode ? 'Save Changes as Draft' : 'Save as Draft'}
             </Button>
           </div>
           
           <Button type="submit" disabled={isLoading}>
             <Send className="h-4 w-4 mr-2" />
-            {isLoading ? 'Creating...' : 'Create Offering'}
+            {isLoading 
+              ? (isEditMode ? 'Updating...' : 'Creating...') 
+              : (isEditMode ? 'Update Offering' : 'Create Offering')
+            }
           </Button>
         </div>
       </form>
