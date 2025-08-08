@@ -38,16 +38,16 @@ export const transformOfferingForDisplay = (offering: InvestmentOfferingWithDeta
       media.media_type === 'featured_image'
     );
     
-    if (featuredImage && featuredImage.url) {
-      primaryImage = getStorageUrl(featuredImage.url);
+    if (featuredImage && (featuredImage.file_path || featuredImage.url)) {
+      primaryImage = getStorageUrl(featuredImage.file_path || featuredImage.url);
     } else {
       // Fallback to first image ordered by display_order
       const firstImage = offering.offering_media
         .filter(media => media.media_type === 'image' || media.media_type === 'featured_image')
         .sort((a, b) => (a.display_order || 0) - (b.display_order || 0))[0];
       
-      if (firstImage && firstImage.url) {
-        primaryImage = getStorageUrl(firstImage.url);
+      if (firstImage && (firstImage.file_path || firstImage.url)) {
+        primaryImage = getStorageUrl(firstImage.file_path || firstImage.url);
       }
     }
   }

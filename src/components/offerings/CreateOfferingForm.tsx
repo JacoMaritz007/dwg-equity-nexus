@@ -12,12 +12,13 @@ import { Separator } from '@/components/ui/separator';
 import { Progress } from '@/components/ui/progress';
 import { ArrowLeft, Save, Send } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { FileUploadField } from './FileUploadField';
+import { MediaPreview } from './MediaPreview';
 import { MilestoneManager, type Milestone } from './MilestoneManager';
-import { InvestmentOfferingWithDetails } from '@/types/investment';
+import { InvestmentOfferingWithDetails, OfferingMedia } from '@/types/investment';
+import { toast } from 'sonner';
 
 const createOfferingSchema = z.object({
   // Deal Overview
@@ -77,10 +78,19 @@ export const CreateOfferingForm: React.FC<CreateOfferingFormProps> = ({
   isEditMode = false 
 }) => {
   const navigate = useNavigate();
-  const { toast } = useToast();
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [milestones, setMilestones] = useState<Milestone[]>([]);
+  
+  // Existing media state for edit mode
+  const [existingMedia, setExistingMedia] = useState<OfferingMedia[]>([]);
+  const [mediaToDelete, setMediaToDelete] = useState<string[]>([]);
+
+  // Function to handle media deletion
+  const handleRemoveMedia = (mediaId: string) => {
+    setMediaToDelete(prev => [...prev, mediaId]);
+    setExistingMedia(prev => prev.filter(media => media.id !== mediaId));
+  };
   
   // File upload states
   const [listerLogo, setListerLogo] = useState<File[] | null>(null);
@@ -168,6 +178,21 @@ export const CreateOfferingForm: React.FC<CreateOfferingFormProps> = ({
         }));
         setMilestones(existingMilestones);
       }
+
+      // Populate existing media
+      if (offering.offering_media) {
+        setExistingMedia(offering.offering_media);
+        
+        // Set video links if any
+        const videoLinks = offering.offering_media
+          .filter(m => m.media_type === 'video_link')
+          .map(m => m.url)
+          .filter(Boolean)
+          .join('\n');
+        if (videoLinks) {
+          setVideoLinks(videoLinks);
+        }
+      }
     }
   }, [isEditMode, offering, reset]);
 
@@ -223,11 +248,7 @@ export const CreateOfferingForm: React.FC<CreateOfferingFormProps> = ({
       }
     } catch (error) {
       console.error('Error saving offering:', error);
-      toast({
-        title: "Error",
-        description: `Failed to ${isEditMode ? 'update' : 'create'} offering. Please try again.`,
-        variant: "destructive"
-      });
+      toast.error(`Failed to ${isEditMode ? 'update' : 'create'} offering. Please try again.`);
     } finally {
       setIsLoading(false);
     }
@@ -383,10 +404,7 @@ export const CreateOfferingForm: React.FC<CreateOfferingFormProps> = ({
         }
       }
 
-      toast({
-        title: isDraft ? "Draft saved successfully" : "Offering created successfully",
-        description: isDraft ? "Your draft has been saved." : "The investment offering has been created and published."
-      });
+      toast.success(isDraft ? "Draft saved successfully" : "Offering created successfully");
 
       navigate('/admin/offerings');
   };
@@ -454,6 +472,14 @@ export const CreateOfferingForm: React.FC<CreateOfferingFormProps> = ({
 
     if (offeringError) throw offeringError;
 
+    // Delete media marked for deletion
+    if (mediaToDelete.length > 0) {
+      await supabase
+        .from('offering_media')
+        .delete()
+        .in('id', mediaToDelete);
+    }
+
     // Handle new media uploads (keep existing ones, add new ones)
     const mediaUploads: Array<{ type: string; file: File; order?: number }> = [];
     
@@ -473,7 +499,7 @@ export const CreateOfferingForm: React.FC<CreateOfferingFormProps> = ({
       const filePath = await uploadFile(upload.file, 'offering-media', fileName);
       
       if (filePath) {
-        // Remove existing media of the same type
+        // Remove existing media of the same type if uploading new ones
         await supabase
           .from('offering_media')
           .delete()
@@ -562,10 +588,7 @@ export const CreateOfferingForm: React.FC<CreateOfferingFormProps> = ({
       }
     }
 
-    toast({
-      title: isDraft ? "Draft updated successfully" : "Offering updated successfully",
-      description: isDraft ? "Your draft has been saved." : "The investment offering has been updated."
-    });
+    toast.success(isDraft ? "Draft updated successfully" : "Offering updated successfully");
 
     navigate('/admin/offerings');
   };
@@ -1018,12 +1041,57 @@ export const CreateOfferingForm: React.FC<CreateOfferingFormProps> = ({
             <CardTitle>5. Deal Media Upload</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
+            {/* Existing Media Preview */}
+            {isEditMode && existingMedia.length > 0 && (
+              <div className="space-y-4">
+                <h4 className="text-sm font-medium">Existing Media</h4>
+                <div className="space-y-4">
+                  <MediaPreview 
+                    media={existingMedia} 
+                    onRemove={handleRemoveMedia}
+                    mediaType="lister_logo"
+                    title="Lister Logo"
+                  />
+                  <MediaPreview 
+                    media={existingMedia} 
+                    onRemove={handleRemoveMedia}
+                    mediaType="sponsor_logo"
+                    title="Sponsor Logo"
+                  />
+                  <MediaPreview 
+                    media={existingMedia} 
+                    onRemove={handleRemoveMedia}
+                    mediaType="dd_provider_logo"
+                    title="DD Provider Logo"
+                  />
+                  <MediaPreview 
+                    media={existingMedia} 
+                    onRemove={handleRemoveMedia}
+                    mediaType="featured_image"
+                    title="Featured Image"
+                  />
+                  <MediaPreview 
+                    media={existingMedia} 
+                    onRemove={handleRemoveMedia}
+                    mediaType="gallery_image"
+                    title="Gallery Images"
+                  />
+                  <MediaPreview 
+                    media={existingMedia} 
+                    onRemove={handleRemoveMedia}
+                    mediaType="video_link"
+                    title="Video Links"
+                  />
+                </div>
+              </div>
+            )}
+            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <FileUploadField
                 label="Lister Logo"
-                description="Company logo for the listing entity"
+                description={isEditMode ? "Upload new logo to replace existing" : "Company logo for the listing entity"}
                 accept="image/*"
-                required
+                required={!isEditMode}
                 value={listerLogo}
                 onChange={setListerLogo}
                 maxSizeMB={5}
@@ -1031,7 +1099,7 @@ export const CreateOfferingForm: React.FC<CreateOfferingFormProps> = ({
 
               <FileUploadField
                 label="Sponsor Logo"
-                description="Optional sponsor company logo"
+                description={isEditMode ? "Upload new logo to replace existing" : "Optional sponsor company logo"}
                 accept="image/*"
                 value={sponsorLogo}
                 onChange={setSponsorLogo}
@@ -1040,7 +1108,7 @@ export const CreateOfferingForm: React.FC<CreateOfferingFormProps> = ({
 
               <FileUploadField
                 label="DD Provider Logo"
-                description="Due diligence provider logo"
+                description={isEditMode ? "Upload new logo to replace existing" : "Due diligence provider logo"}
                 accept="image/*"
                 value={ddProviderLogo}
                 onChange={setDdProviderLogo}
@@ -1049,9 +1117,9 @@ export const CreateOfferingForm: React.FC<CreateOfferingFormProps> = ({
 
               <FileUploadField
                 label="Featured Image"
-                description="Main image for the investment opportunity"
+                description={isEditMode ? "Upload new image to replace existing" : "Main image for the investment opportunity"}
                 accept="image/*"
-                required
+                required={!isEditMode}
                 value={featuredImage}
                 onChange={setFeaturedImage}
                 maxSizeMB={10}
@@ -1060,10 +1128,10 @@ export const CreateOfferingForm: React.FC<CreateOfferingFormProps> = ({
 
             <FileUploadField
               label="Gallery Images"
-              description="Additional images showcasing the investment (minimum 4 required)"
+              description={isEditMode ? "Upload new images to add to gallery" : "Additional images showcasing the investment (minimum 4 required)"}
               accept="image/*"
               multiple
-              required
+              required={!isEditMode}
               maxFiles={10}
               value={galleryImages}
               onChange={setGalleryImages}
