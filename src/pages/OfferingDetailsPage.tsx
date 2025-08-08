@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -22,13 +22,16 @@ import { useInvestmentOfferings } from '@/hooks/useInvestmentOfferings';
 import { InvestmentOfferingWithDetails } from '@/types/investment';
 import { transformOfferingForDisplay, getStatusColor } from '@/utils/offeringHelpers';
 import { Navigation } from '@/components/layout/Navigation';
+import { InvestmentProcessModal } from '@/components/investment/InvestmentProcessModal';
 
 export const OfferingDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { fetchOfferingById } = useInvestmentOfferings();
   const [offering, setOffering] = useState<InvestmentOfferingWithDetails | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showInvestmentModal, setShowInvestmentModal] = useState(false);
 
   useEffect(() => {
     const loadOffering = async () => {
@@ -49,6 +52,13 @@ export const OfferingDetailsPage: React.FC = () => {
 
     loadOffering();
   }, [id, fetchOfferingById, navigate]);
+
+  // Check if user wants to start investment process
+  useEffect(() => {
+    if (searchParams.get('action') === 'invest' && offering) {
+      setShowInvestmentModal(true);
+    }
+  }, [searchParams, offering]);
 
   if (loading) {
     return (
@@ -105,41 +115,46 @@ export const OfferingDetailsPage: React.FC = () => {
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Image */}
           <div className="lg:w-1/2">
-            <div className="aspect-video w-full bg-muted rounded-lg flex items-center justify-center overflow-hidden">
-              {displayData.image.includes('placeholder') ? (
-                <Building className="h-20 w-20 text-muted-foreground" />
-              ) : (
+            <div className="aspect-video w-full bg-muted rounded-lg overflow-hidden">
+              {offering.offering_media?.find(media => media.media_type === 'featured_image')?.file_path ? (
                 <img 
-                  src={displayData.image} 
+                  src={`https://eqayhqfntpqzbpbkrkvu.supabase.co/storage/v1/object/public/offering-media/${offering.offering_media.find(media => media.media_type === 'featured_image')?.file_path}`}
                   alt={offering.title}
                   className="w-full h-full object-cover"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
-                    target.src = '/api/placeholder/400/250';
+                    target.parentElement!.innerHTML = '<div class="w-full h-full flex items-center justify-center bg-muted"><svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-muted-foreground"><rect width="16" height="20" x="4" y="2" rx="2" ry="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01"/><path d="M16 6h.01"/><path d="M12 6h.01"/><path d="M12 10h.01"/><path d="M12 14h.01"/><path d="M16 10h.01"/><path d="M16 14h.01"/><path d="M8 10h.01"/><path d="M8 14h.01"/></svg></div>';
                   }}
                 />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-muted">
+                  <Building className="h-20 w-20 text-muted-foreground" />
+                </div>
               )}
             </div>
             
-            {/* Additional Media Gallery */}
-            {offering.offering_media && offering.offering_media.length > 1 && (
-              <div className="mt-4 grid grid-cols-3 gap-2">
-                {offering.offering_media
-                  .filter(media => media.url && media.url !== displayData.image)
-                  .slice(0, 3)
-                  .map((media, index) => (
-                    <div key={media.id} className="aspect-video bg-muted rounded overflow-hidden">
-                      <img 
-                        src={media.url?.startsWith('http') ? media.url : `/api/placeholder/120/80`}
-                        alt={`${offering.title} ${index + 2}`}
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          target.src = '/api/placeholder/120/80';
-                        }}
-                      />
-                    </div>
-                  ))}
+            {/* Gallery Images */}
+            {offering.offering_media && offering.offering_media.filter(media => media.media_type === 'gallery_image').length > 0 && (
+              <div className="mt-4">
+                <h4 className="font-medium mb-2">Gallery</h4>
+                <div className="grid grid-cols-3 gap-2">
+                  {offering.offering_media
+                    .filter(media => media.media_type === 'gallery_image')
+                    .slice(0, 6)
+                    .map((media, index) => (
+                      <div key={media.id} className="aspect-video bg-muted rounded overflow-hidden cursor-pointer hover:opacity-80 transition-opacity">
+                        <img 
+                          src={`https://eqayhqfntpqzbpbkrkvu.supabase.co/storage/v1/object/public/offering-media/${media.file_path}`}
+                          alt={`${offering.title} gallery ${index + 1}`}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.parentElement!.innerHTML = '<div class="w-full h-full flex items-center justify-center bg-muted"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-muted-foreground"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg></div>';
+                          }}
+                        />
+                      </div>
+                    ))}
+                </div>
               </div>
             )}
           </div>
@@ -226,7 +241,11 @@ export const OfferingDetailsPage: React.FC = () => {
             {/* Investment Actions */}
             {offering.status === 'active' && (
               <div className="space-y-2">
-                <Button size="lg" className="w-full financial-button">
+                <Button 
+                  size="lg" 
+                  className="w-full financial-button"
+                  onClick={() => setShowInvestmentModal(true)}
+                >
                   Invest Now
                 </Button>
                 <p className="text-xs text-muted-foreground text-center">
@@ -444,6 +463,15 @@ export const OfferingDetailsPage: React.FC = () => {
             </Card>
           </TabsContent>
         </Tabs>
+
+        {/* Investment Process Modal */}
+        {offering && (
+          <InvestmentProcessModal
+            offering={offering}
+            isOpen={showInvestmentModal}
+            onClose={() => setShowInvestmentModal(false)}
+          />
+        )}
       </div>
     </div>
   );

@@ -73,8 +73,24 @@ export const InvestPage: React.FC = () => {
 
   const OfferingCard: React.FC<{ offering: OfferingDisplayData }> = ({ offering }) => (
     <Card className="investment-card hover:shadow-lg transition-all duration-300">
-      <div className="aspect-video w-full bg-muted rounded-t-lg flex items-center justify-center">
-        <Building className="h-12 w-12 text-muted-foreground" />
+      <div className="aspect-video w-full bg-muted rounded-t-lg overflow-hidden">
+        {offering.image && !offering.image.includes('placeholder') ? (
+          <img 
+            src={offering.image} 
+            alt={offering.title}
+            className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+            onError={(e) => {
+              const target = e.target as HTMLImageElement;
+              target.style.display = 'none';
+              target.parentElement!.classList.add('flex', 'items-center', 'justify-center');
+              target.parentElement!.innerHTML = '<div class="h-12 w-12 text-muted-foreground"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-building"><rect width="16" height="20" x="4" y="2" rx="2" ry="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01"/><path d="M16 6h.01"/><path d="M12 6h.01"/><path d="M12 10h.01"/><path d="M12 14h.01"/><path d="M16 10h.01"/><path d="M16 14h.01"/><path d="M8 10h.01"/><path d="M8 14h.01"/></svg></div>';
+            }}
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-muted">
+            <Building className="h-12 w-12 text-muted-foreground" />
+          </div>
+        )}
       </div>
       
       <CardHeader>
@@ -159,11 +175,16 @@ export const InvestPage: React.FC = () => {
             </Link>
           </Button>
           {offering.status === 'active' && (
-            <Button size="sm" className="flex-1 financial-button" asChild>
-              <Link to={`/invest/offerings/${offering.id}`}>
-                Invest Now
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
+            <Button 
+              size="sm" 
+              className="flex-1 financial-button"
+              onClick={() => {
+                // This will be handled by the InvestmentProcessModal in OfferingDetailsPage
+                window.location.href = `/invest/offerings/${offering.id}?action=invest`;
+              }}
+            >
+              Invest Now
+              <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           )}
         </div>
