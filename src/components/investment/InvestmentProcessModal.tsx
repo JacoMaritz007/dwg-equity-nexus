@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -15,11 +15,14 @@ import {
   ArrowRight,
   User,
   Shield,
-  Clock
+  Clock,
+  MapPin
 } from 'lucide-react';
 import { InvestmentOfferingWithDetails } from '@/types/investment';
 import { useAuth } from '@/contexts/AuthContext';
+import { useVerificationStatus } from '@/hooks/useVerificationStatus';
 import { supabase } from '@/integrations/supabase/client';
+import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 
 interface InvestmentProcessModalProps {
@@ -30,60 +33,24 @@ interface InvestmentProcessModalProps {
 
 type ProcessStep = 'verification' | 'diligence' | 'invest' | 'esign' | 'fund';
 
-interface UserProfile {
-  kyc_verified: boolean;
-  identity_verified: boolean;
-  address_verified: boolean;
-  financial_verified: boolean;
-  is_accredited: boolean;
-}
-
 export const InvestmentProcessModal: React.FC<InvestmentProcessModalProps> = ({
   offering,
   isOpen,
   onClose,
 }) => {
   const { user } = useAuth();
+  const { status: verificationStatus, loading } = useVerificationStatus();
   const [currentStep, setCurrentStep] = useState<ProcessStep>('verification');
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
   const [investmentAmount, setInvestmentAmount] = useState<number>(offering.minimum_investment || 0);
 
-  useEffect(() => {
-    if (isOpen && user) {
-      fetchUserProfile();
-    }
-  }, [isOpen, user]);
-
-  const fetchUserProfile = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('kyc_verified, identity_verified, address_verified, financial_verified, is_accredited')
-        .eq('id', user?.id)
-        .single();
-
-      if (error) throw error;
-      setUserProfile(data);
-
-      // Determine starting step based on verification status
-      if (data?.kyc_verified && data?.identity_verified) {
-        setCurrentStep('diligence');
-      } else {
-        setCurrentStep('verification');
-      }
-    } catch (error) {
-      console.error('Error fetching user profile:', error);
-      toast.error('Failed to fetch user profile');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const createInvestmentApplication = async () => {
+    if (!verificationStatus?.can_invest) {
+      toast.error('Please complete verification before investing');
+      return;
+    }
+
     try {
-      // For now, create a user investment record directly
+      // Create user investment record
       const { data, error } = await supabase
         .from('user_investments')
         .insert({
@@ -117,9 +84,6 @@ export const InvestmentProcessModal: React.FC<InvestmentProcessModalProps> = ({
     }
   };
 
-  const isVerificationComplete = userProfile?.kyc_verified && 
-                                 userProfile?.identity_verified;
-
   const steps = [
     { id: 'verification', title: 'Verification', icon: Shield, description: 'Verify your identity and eligibility' },
     { id: 'diligence', title: 'Due Diligence', icon: FileText, description: 'Review investment documents' },
@@ -140,14 +104,22 @@ export const InvestmentProcessModal: React.FC<InvestmentProcessModalProps> = ({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {!isVerificationComplete ? (
+        {!verificationStatus?.can_invest ? (
           <>
             <Alert>
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
-                You must complete account verification before investing. This ensures compliance with regulatory requirements.
+                You must complete all verification steps before investing. This ensures compliance with regulatory requirements.
               </AlertDescription>
             </Alert>
+            
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span>Overall Progress</span>
+                <span>{verificationStatus?.overall_progress || 0}%</span>
+              </div>
+              <Progress value={verificationStatus?.overall_progress || 0} className="h-2" />
+            </div>
             
             <div className="space-y-3">
               <div className="flex items-center justify-between p-3 border rounded-lg">
@@ -155,44 +127,64 @@ export const InvestmentProcessModal: React.FC<InvestmentProcessModalProps> = ({
                   <User className="h-5 w-5 text-muted-foreground" />
                   <span>Identity Verification</span>
                 </div>
-                <Badge variant={userProfile?.identity_verified ? "default" : "outline"}>
-                  {userProfile?.identity_verified ? "Verified" : "Pending"}
+                <Badge variant={verificationStatus?.identity_verified ? "default" : "outline"}>
+                  {verificationStatus?.identity_verified ? "Complete" : "Required"}
                 </Badge>
               </div>
               
               <div className="flex items-center justify-between p-3 border rounded-lg">
                 <div className="flex items-center gap-3">
-                  <FileText className="h-5 w-5 text-muted-foreground" />
-                  <span>KYC Verification</span>
+                  <MapPin className="h-5 w-5 text-muted-foreground" />
+                  <span>Address Verification</span>
                 </div>
-                <Badge variant={userProfile?.kyc_verified ? "default" : "outline"}>
-                  {userProfile?.kyc_verified ? "Verified" : "Pending"}
+                <Badge variant={verificationStatus?.address_verified ? "default" : "outline"}>
+                  {verificationStatus?.address_verified ? "Complete" : "Required"}
                 </Badge>
               </div>
               
               <div className="flex items-center justify-between p-3 border rounded-lg">
                 <div className="flex items-center gap-3">
                   <DollarSign className="h-5 w-5 text-muted-foreground" />
-                  <span>Accredited Investor Status</span>
+                  <span>Financial Verification</span>
                 </div>
-                <Badge variant={userProfile?.is_accredited ? "default" : "outline"}>
-                  {userProfile?.is_accredited ? "Verified" : "Pending"}
+                <Badge variant={verificationStatus?.financial_verified ? "default" : "outline"}>
+                  {verificationStatus?.financial_verified ? "Complete" : "Required"}
+                </Badge>
+              </div>
+
+              <div className="flex items-center justify-between p-3 border rounded-lg">
+                <div className="flex items-center gap-3">
+                  <Shield className="h-5 w-5 text-muted-foreground" />
+                  <span>PEP Screening</span>
+                </div>
+                <Badge variant={verificationStatus?.pep_screened ? "default" : "outline"}>
+                  {verificationStatus?.pep_screened ? "Complete" : "Required"}
+                </Badge>
+              </div>
+
+              <div className="flex items-center justify-between p-3 border rounded-lg">
+                <div className="flex items-center gap-3">
+                  <AlertTriangle className="h-5 w-5 text-muted-foreground" />
+                  <span>Sanctions Screening</span>
+                </div>
+                <Badge variant={verificationStatus?.sanctions_screened ? "default" : "outline"}>
+                  {verificationStatus?.sanctions_screened ? "Complete" : "Required"}
                 </Badge>
               </div>
             </div>
             
-            <Button 
-              className="w-full" 
-              onClick={() => window.open('/account-status', '_blank')}
-            >
-              Complete Verification Process
+            <Button asChild className="w-full">
+              <Link to="/account-status">
+                <FileText className="w-4 h-4 mr-2" />
+                Complete Verification Process
+              </Link>
             </Button>
           </>
         ) : (
           <>
             <div className="flex items-center gap-2 text-success">
               <CheckCircle className="h-5 w-5" />
-              <span>Verification Complete</span>
+              <span>Verification Complete - Ready to Invest</span>
             </div>
             <Button 
               className="w-full" 

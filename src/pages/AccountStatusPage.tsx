@@ -1,6 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
+import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
@@ -21,18 +19,8 @@ import {
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { DocumentUploadModal } from '@/components/documents/DocumentUploadModal';
-
-interface VerificationStatus {
-  identity_verified: boolean;
-  address_verified: boolean;
-  financial_verified: boolean;
-  pep_screened: boolean;
-  sanctions_screened: boolean;
-  kyc_completed: boolean;
-  investor_classification: string | null;
-  verification_level: string | null;
-  overall_progress: number;
-}
+import { useVerificationStatus } from '@/hooks/useVerificationStatus';
+import { VerificationStatusCard } from '@/components/verification/VerificationStatusCard';
 
 const VerificationCard: React.FC<{
   title: string;
@@ -102,78 +90,9 @@ const VerificationCard: React.FC<{
 };
 
 export const AccountStatusPage: React.FC = () => {
-  const { user } = useAuth();
-  const [verificationStatus, setVerificationStatus] = useState<VerificationStatus | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { status: verificationStatus, loading, refetch } = useVerificationStatus();
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [selectedDocumentCategory, setSelectedDocumentCategory] = useState<'identity' | 'address' | 'financial' | undefined>();
-
-  useEffect(() => {
-    fetchVerificationStatus();
-  }, [user]);
-
-  const fetchVerificationStatus = async () => {
-    if (!user) return;
-
-    try {
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select(`
-          is_accredited,
-          kyc_verified,
-          verification_status,
-          investor_classification,
-          is_pep,
-          pep_screening_date,
-          sanctions_screening_date,
-          sanctions_clear
-        `)
-        .eq('id', user.id)
-        .single();
-
-      if (error) throw error;
-
-      // Calculate verification status based on existing data
-      const identity_verified = profile.verification_status === 'approved';
-      const address_verified = profile.verification_status === 'approved';
-      const financial_verified = profile.verification_status === 'approved' && profile.is_accredited;
-      const pep_screened = profile.pep_screening_date !== null;
-      const sanctions_screened = profile.sanctions_screening_date !== null;
-
-      // Calculate overall progress
-      const verifications = [
-        identity_verified,
-        address_verified,
-        financial_verified,
-        pep_screened,
-        sanctions_screened
-      ];
-      
-      const completedCount = verifications.filter(Boolean).length;
-      const overall_progress = Math.round((completedCount / verifications.length) * 100);
-
-      setVerificationStatus({
-        identity_verified,
-        address_verified,
-        financial_verified,
-        pep_screened,
-        sanctions_screened,
-        kyc_completed: profile.kyc_verified || false,
-        investor_classification: profile.investor_classification,
-        verification_level: profile.investor_classification === 'high_net_worth' || profile.investor_classification === 'sophisticated' ? 'enhanced' : 'basic',
-        overall_progress
-      });
-    } catch (error) {
-      console.error('Error fetching verification status:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load verification status",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleUploadClick = (category: 'identity' | 'address' | 'financial') => {
     setSelectedDocumentCategory(category);
@@ -182,7 +101,7 @@ export const AccountStatusPage: React.FC = () => {
 
   const handleUploadSuccess = () => {
     // Refresh verification status after successful upload
-    fetchVerificationStatus();
+    refetch();
   };
 
   if (loading) {
@@ -210,45 +129,15 @@ export const AccountStatusPage: React.FC = () => {
         </p>
       </div>
 
-      {/* Overall Progress */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Shield className="h-5 w-5" />
-            Verification Progress
-          </CardTitle>
-          <CardDescription>
-            Complete all verification steps to unlock premium features
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Overall Completion</span>
-              <span className="text-sm text-muted-foreground">
-                {verificationStatus?.overall_progress}%
-              </span>
-            </div>
-            <Progress value={verificationStatus?.overall_progress} className="h-2" />
-            
-            {verificationStatus?.overall_progress === 100 ? (
-              <Alert className="bg-success/10 border-success/20">
-                <CheckCircle2 className="h-4 w-4 text-success" />
-                <AlertDescription className="text-success">
-                  Your account is fully verified! You now have access to all investment opportunities.
-                </AlertDescription>
-              </Alert>
-            ) : (
-              <Alert>
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                  Complete remaining verification steps to access premium investment opportunities and higher investment limits.
-                </AlertDescription>
-              </Alert>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      {/* Verification Status Card */}
+      <VerificationStatusCard
+        overallProgress={verificationStatus?.overall_progress || 0}
+        identityVerified={verificationStatus?.identity_verified || false}
+        addressVerified={verificationStatus?.address_verified || false}
+        financialVerified={verificationStatus?.financial_verified || false}
+        kycCompleted={verificationStatus?.kyc_completed || false}
+        isAccredited={verificationStatus?.is_accredited || false}
+      />
 
       {/* Verification Categories */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">

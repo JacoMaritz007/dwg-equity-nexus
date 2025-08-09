@@ -7,9 +7,10 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { AlertCircle, FileText, Search, Filter, Download, Eye, Check, X, Clock, User } from 'lucide-react';
+import { AlertCircle, FileText, Search, Filter, Download, Eye, Check, X, Clock, User, Shield } from 'lucide-react';
 import { toast } from 'sonner';
 import { DocumentReviewModal } from '@/components/admin/DocumentReviewModal';
+import { AdminScreeningModal } from '@/components/admin/AdminScreeningModal';
 import { useDocuments } from '@/hooks/useDocuments';
 
 interface VerificationDocumentWithUser {
@@ -41,6 +42,13 @@ const AdminDocuments: React.FC = () => {
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [selectedDocument, setSelectedDocument] = useState<VerificationDocumentWithUser | null>(null);
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [screeningModalOpen, setScreeningModalOpen] = useState(false);
+  const [selectedUserForScreening, setSelectedUserForScreening] = useState<{
+    userId: string;
+    userName: string;
+    userEmail: string;
+    screeningType: 'pep' | 'sanctions';
+  } | null>(null);
 
   // Memoize admin status to prevent re-renders
   const isAdmin = useMemo(() => {
@@ -127,6 +135,22 @@ const AdminDocuments: React.FC = () => {
       console.error('Error updating document:', err);
       toast.error('Failed to update document status');
     }
+  };
+
+  const handleInitiateScreening = (userId: string, userName: string, userEmail: string, screeningType: 'pep' | 'sanctions') => {
+    setSelectedUserForScreening({
+      userId,
+      userName,
+      userEmail,
+      screeningType
+    });
+    setScreeningModalOpen(true);
+  };
+
+  const handleScreeningComplete = () => {
+    fetchDocuments();
+    setScreeningModalOpen(false);
+    setSelectedUserForScreening(null);
   };
 
   const filteredDocuments = useMemo(() => {
@@ -346,6 +370,27 @@ const AdminDocuments: React.FC = () => {
                         <Eye className="w-4 h-4 mr-1" />
                         Review
                       </Button>
+                      
+                      {doc.verification_status === 'approved' && (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleInitiateScreening(doc.user_id, doc.user_name, doc.user_email, 'pep')}
+                          >
+                            <Shield className="w-4 h-4 mr-1" />
+                            PEP Screen
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleInitiateScreening(doc.user_id, doc.user_name, doc.user_email, 'sanctions')}
+                          >
+                            <AlertCircle className="w-4 h-4 mr-1" />
+                            Sanctions Screen
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -363,6 +408,19 @@ const AdminDocuments: React.FC = () => {
           document={selectedDocument}
           onReview={handleReviewDocument}
           getSignedUrl={getSignedUrl}
+        />
+      )}
+
+      {/* Admin Screening Modal */}
+      {selectedUserForScreening && (
+        <AdminScreeningModal
+          open={screeningModalOpen}
+          onOpenChange={setScreeningModalOpen}
+          userId={selectedUserForScreening.userId}
+          userName={selectedUserForScreening.userName}
+          userEmail={selectedUserForScreening.userEmail}
+          screeningType={selectedUserForScreening.screeningType}
+          onScreeningComplete={handleScreeningComplete}
         />
       )}
     </div>

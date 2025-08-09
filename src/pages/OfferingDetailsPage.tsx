@@ -21,14 +21,17 @@ import {
 import { useInvestmentOfferings } from '@/hooks/useInvestmentOfferings';
 import { InvestmentOfferingWithDetails } from '@/types/investment';
 import { transformOfferingForDisplay, getStatusColor } from '@/utils/offeringHelpers';
+import { useVerificationStatus } from '@/hooks/useVerificationStatus';
 import { Navigation } from '@/components/layout/Navigation';
 import { InvestmentProcessModal } from '@/components/investment/InvestmentProcessModal';
+import { toast } from 'sonner';
 
 export const OfferingDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { fetchOfferingById } = useInvestmentOfferings();
+  const { status: verificationStatus } = useVerificationStatus();
   const [offering, setOffering] = useState<InvestmentOfferingWithDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [showInvestmentModal, setShowInvestmentModal] = useState(false);
@@ -244,9 +247,16 @@ export const OfferingDetailsPage: React.FC = () => {
                 <Button 
                   size="lg" 
                   className="w-full financial-button"
-                  onClick={() => setShowInvestmentModal(true)}
+                  onClick={() => {
+                    if (!verificationStatus?.can_invest) {
+                      toast.error('Please complete verification before investing');
+                      window.location.href = '/account-status';
+                      return;
+                    }
+                    setShowInvestmentModal(true);
+                  }}
                 >
-                  Invest Now
+                  {verificationStatus?.can_invest ? 'Invest Now' : 'Complete Verification to Invest'}
                 </Button>
                 <p className="text-xs text-muted-foreground text-center">
                   By investing, you agree to our terms and conditions

@@ -16,11 +16,14 @@ import {
   Search,
   Filter,
   Eye,
-  ArrowRight
+  ArrowRight,
+  AlertTriangle
 } from 'lucide-react';
 import { useInvestmentOfferings } from '@/hooks/useInvestmentOfferings';
+import { useVerificationStatus } from '@/hooks/useVerificationStatus';
 import { transformOfferingForDisplay } from '@/utils/offeringHelpers';
 import { OfferingDisplayData } from '@/types/investment';
+import { toast } from 'sonner';
 
 
 export const InvestPage: React.FC = () => {
@@ -30,6 +33,7 @@ export const InvestPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState('active');
   
   const { offerings, loading, error, fetchOfferings, getActiveOfferings, getPastOfferings } = useInvestmentOfferings();
+  const { status: verificationStatus } = useVerificationStatus();
   const [displayOfferings, setDisplayOfferings] = useState<OfferingDisplayData[]>([]);
 
   // Transform offerings for display
@@ -179,12 +183,25 @@ export const InvestPage: React.FC = () => {
               size="sm" 
               className="flex-1 financial-button"
               onClick={() => {
-                // This will be handled by the InvestmentProcessModal in OfferingDetailsPage
+                if (!verificationStatus?.can_invest) {
+                  toast.error('Please complete verification before investing');
+                  window.location.href = '/account-status';
+                  return;
+                }
                 window.location.href = `/invest/offerings/${offering.id}?action=invest`;
               }}
             >
-              Invest Now
-              <ArrowRight className="ml-2 h-4 w-4" />
+              {verificationStatus?.can_invest ? (
+                <>
+                  Invest Now
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </>
+              ) : (
+                <>
+                  <AlertTriangle className="mr-2 h-4 w-4" />
+                  Verify to Invest
+                </>
+              )}
             </Button>
           )}
         </div>

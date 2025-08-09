@@ -58,6 +58,69 @@ export type Database = {
           },
         ]
       }
+      compliance_screening_documents: {
+        Row: {
+          created_at: string
+          expiry_date: string | null
+          file_name: string
+          file_path: string
+          file_size: number | null
+          id: string
+          mime_type: string | null
+          notes: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          screening_date: string
+          screening_provider: string | null
+          screening_reference: string | null
+          screening_type: string
+          status: Database["public"]["Enums"]["verification_status"]
+          updated_at: string
+          uploaded_by: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expiry_date?: string | null
+          file_name: string
+          file_path: string
+          file_size?: number | null
+          id?: string
+          mime_type?: string | null
+          notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          screening_date?: string
+          screening_provider?: string | null
+          screening_reference?: string | null
+          screening_type: string
+          status?: Database["public"]["Enums"]["verification_status"]
+          updated_at?: string
+          uploaded_by: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expiry_date?: string | null
+          file_name?: string
+          file_path?: string
+          file_size?: number | null
+          id?: string
+          mime_type?: string | null
+          notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          screening_date?: string
+          screening_provider?: string | null
+          screening_reference?: string | null
+          screening_type?: string
+          status?: Database["public"]["Enums"]["verification_status"]
+          updated_at?: string
+          uploaded_by?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       documents: {
         Row: {
           created_at: string
