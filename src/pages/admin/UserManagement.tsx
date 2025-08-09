@@ -1,16 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { usePermissions } from '@/hooks/usePermissions';
+import { useVerificationStatus } from '@/hooks/useVerificationStatus';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Progress } from '@/components/ui/progress';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
   DropdownMenuItem, 
-  DropdownMenuTrigger 
+  DropdownMenuTrigger,
+  DropdownMenuSeparator
 } from '@/components/ui/dropdown-menu';
 import { 
   Table,
@@ -20,6 +24,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { AdminScreeningModal } from '@/components/admin/AdminScreeningModal';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { 
@@ -32,7 +37,9 @@ import {
   DollarSign,
   CheckCircle,
   XCircle,
-  AlertCircle
+  AlertCircle,
+  FileText,
+  UserCheck
 } from 'lucide-react';
 
 interface UserProfile {
@@ -47,6 +54,15 @@ interface UserProfile {
   roles: string[];
   total_invested?: number;
   active_investments?: number;
+  verification_status?: {
+    overall_progress: number;
+    identity_verified: boolean;
+    address_verified: boolean;
+    financial_verified: boolean;
+    pep_screened: boolean;
+    sanctions_screened: boolean;
+    can_invest: boolean;
+  };
 }
 
 const UserManagement: React.FC = () => {
@@ -56,6 +72,19 @@ const UserManagement: React.FC = () => {
   const [selectedTab, setSelectedTab] = useState('all');
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [screeningModal, setScreeningModal] = useState<{
+    isOpen: boolean;
+    userId: string;
+    userName: string;
+    userEmail: string;
+    screeningType: 'pep' | 'sanctions';
+  }>({
+    isOpen: false,
+    userId: '',
+    userName: '',
+    userEmail: '',
+    screeningType: 'pep'
+  });
 
   if (!isAdmin()) {
     return (
@@ -87,7 +116,12 @@ const UserManagement: React.FC = () => {
           phone,
           is_accredited,
           kyc_verified,
-          created_at
+          created_at,
+          identity_verified,
+          address_verified,
+          financial_verified,
+          pep_screened,
+          sanctions_screened
         `);
 
       if (profilesError) throw profilesError;
@@ -113,11 +147,32 @@ const UserManagement: React.FC = () => {
         const totalInvested = userInvestments.reduce((sum, inv) => sum + (inv.investment_amount || 0), 0);
         const activeInvestments = userInvestments.filter(inv => inv.status === 'active').length;
 
+        // Calculate verification status
+        const identity_verified = profile.identity_verified || false;
+        const address_verified = profile.address_verified || false;
+        const financial_verified = profile.financial_verified || false;
+        const pep_screened = profile.pep_screened || false;
+        const sanctions_screened = profile.sanctions_screened || false;
+        
+        const totalSteps = 5;
+        const completedSteps = [identity_verified, address_verified, financial_verified, pep_screened, sanctions_screened].filter(Boolean).length;
+        const overall_progress = (completedSteps / totalSteps) * 100;
+        const can_invest = identity_verified && address_verified && financial_verified && pep_screened && sanctions_screened;
+
         return {
           ...profile,
           roles,
           total_invested: totalInvested,
-          active_investments: activeInvestments
+          active_investments: activeInvestments,
+          verification_status: {
+            overall_progress,
+            identity_verified,
+            address_verified,
+            financial_verified,
+            pep_screened,
+            sanctions_screened,
+            can_invest
+          }
         };
       }) || [];
 
@@ -224,6 +279,71 @@ const UserManagement: React.FC = () => {
     }
   };
 
+  const canPerformScreening = (user: UserProfile, screeningType: 'pep' | 'sanctions') => {
+    const verification = user.verification_status;
+    if (!verification) return false;
+    
+    const documentsVerified = verification.identity_verified && 
+                              verification.address_verified && 
+                              verification.financial_verified;
+    
+    if (screeningType === 'pep') {
+      return documentsVerified && !verification.pep_screened;
+    } else {
+      return documentsVerified && !verification.sanctions_screened;
+    }
+  };
+
+  const openScreeningModal = (user: UserProfile, screeningType: 'pep' | 'sanctions') => {
+    setScreeningModal({
+      isOpen: true,
+      userId: user.id,
+      userName: `${user.first_name} ${user.last_name}`,
+      userEmail: user.email || '',
+      screeningType
+    });
+  };
+
+  const handleScreeningComplete = () => {
+    setScreeningModal(prev => ({ ...prev, isOpen: false }));
+    fetchUsers(); // Refresh the user list
+  };
+
+  const getVerificationBadges = (verification: UserProfile['verification_status']) => {
+    if (!verification) return null;
+    
+    const badges = [
+      { label: 'ID', verified: verification.identity_verified, icon: FileText },
+      { label: 'Address', verified: verification.address_verified, icon: FileText },
+      { label: 'Financial', verified: verification.financial_verified, icon: FileText },
+      { label: 'PEP', verified: verification.pep_screened, icon: UserCheck },
+      { label: 'Sanctions', verified: verification.sanctions_screened, icon: UserCheck },
+    ];
+
+    return (
+      <div className="flex gap-1 flex-wrap">
+        {badges.map(({ label, verified, icon: Icon }) => (
+          <TooltipProvider key={label}>
+            <Tooltip>
+              <TooltipTrigger>
+                <Badge 
+                  variant={verified ? "default" : "secondary"}
+                  className={`text-xs ${verified ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}
+                >
+                  <Icon className="h-3 w-3 mr-1" />
+                  {label}
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{label} {verified ? 'Verified' : 'Pending'}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        ))}
+      </div>
+    );
+  };
+
   if (isLoading) {
     return (
       <div className="container mx-auto p-6">
@@ -281,7 +401,7 @@ const UserManagement: React.FC = () => {
                   <TableRow>
                     <TableHead>User</TableHead>
                     <TableHead>Roles</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead>Verification Status</TableHead>
                     <TableHead>Investments</TableHead>
                     <TableHead>Joined</TableHead>
                     <TableHead className="w-[50px]"></TableHead>
@@ -321,20 +441,34 @@ const UserManagement: React.FC = () => {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-2">
-                          {user.kyc_verified ? (
-                            <CheckCircle className="h-4 w-4 text-green-600" />
-                          ) : (
-                            <XCircle className="h-4 w-4 text-red-600" />
-                          )}
-                          <span className="text-sm">
-                            {user.kyc_verified ? 'Verified' : 'Unverified'}
-                          </span>
-                          {user.is_accredited && (
-                            <Badge className="bg-purple-100 text-purple-800">
-                              Accredited
-                            </Badge>
-                          )}
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1">
+                              <Progress 
+                                value={user.verification_status?.overall_progress || 0} 
+                                className="h-2"
+                              />
+                            </div>
+                            <span className="text-xs text-muted-foreground min-w-[3rem]">
+                              {Math.round(user.verification_status?.overall_progress || 0)}%
+                            </span>
+                            {user.verification_status?.can_invest && (
+                              <CheckCircle className="h-4 w-4 text-green-600" />
+                            )}
+                          </div>
+                          {getVerificationBadges(user.verification_status)}
+                          <div className="flex gap-1">
+                            {user.kyc_verified && (
+                              <Badge className="bg-green-100 text-green-800 text-xs">
+                                KYC
+                              </Badge>
+                            )}
+                            {user.is_accredited && (
+                              <Badge className="bg-purple-100 text-purple-800 text-xs">
+                                Accredited
+                              </Badge>
+                            )}
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell>
@@ -360,6 +494,28 @@ const UserManagement: React.FC = () => {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
+                            {/* Screening Actions */}
+                            {canPerformScreening(user, 'pep') && (
+                              <DropdownMenuItem 
+                                onClick={() => openScreeningModal(user, 'pep')}
+                              >
+                                <UserCheck className="h-4 w-4 mr-2" />
+                                PEP Screen
+                              </DropdownMenuItem>
+                            )}
+                            {canPerformScreening(user, 'sanctions') && (
+                              <DropdownMenuItem 
+                                onClick={() => openScreeningModal(user, 'sanctions')}
+                              >
+                                <UserCheck className="h-4 w-4 mr-2" />
+                                Sanctions Screen
+                              </DropdownMenuItem>
+                            )}
+                            {(canPerformScreening(user, 'pep') || canPerformScreening(user, 'sanctions')) && (
+                              <DropdownMenuSeparator />
+                            )}
+                            
+                            {/* KYC Actions */}
                             <DropdownMenuItem 
                               onClick={() => toggleKYCStatus(user.id, user.kyc_verified)}
                             >
@@ -375,6 +531,10 @@ const UserManagement: React.FC = () => {
                                 </>
                               )}
                             </DropdownMenuItem>
+                            
+                            <DropdownMenuSeparator />
+                            
+                            {/* Role Actions */}
                             {!user.roles.includes('admin') && (
                               <DropdownMenuItem 
                                 onClick={() => updateUserRole(user.id, 'admin', 'add')}
@@ -413,6 +573,17 @@ const UserManagement: React.FC = () => {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Screening Modal */}
+      <AdminScreeningModal
+        open={screeningModal.isOpen}
+        onOpenChange={(open) => setScreeningModal(prev => ({ ...prev, isOpen: open }))}
+        userId={screeningModal.userId}
+        userName={screeningModal.userName}
+        userEmail={screeningModal.userEmail}
+        screeningType={screeningModal.screeningType}
+        onScreeningComplete={handleScreeningComplete}
+      />
     </div>
   );
 };
