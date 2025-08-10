@@ -10,7 +10,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertCircle, FileText, Search, Filter, Download, Eye, Check, X, Clock, User, Shield } from 'lucide-react';
 import { toast } from 'sonner';
 import { DocumentReviewModal } from '@/components/admin/DocumentReviewModal';
-import { AdminScreeningModal } from '@/components/admin/AdminScreeningModal';
 import { useDocuments } from '@/hooks/useDocuments';
 
 interface VerificationDocumentWithUser {
@@ -42,13 +41,6 @@ const AdminDocuments: React.FC = () => {
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [selectedDocument, setSelectedDocument] = useState<VerificationDocumentWithUser | null>(null);
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
-  const [screeningModalOpen, setScreeningModalOpen] = useState(false);
-  const [selectedUserForScreening, setSelectedUserForScreening] = useState<{
-    userId: string;
-    userName: string;
-    userEmail: string;
-    screeningType: 'pep' | 'sanctions';
-  } | null>(null);
 
   // Memoize admin status to prevent re-renders
   const isAdmin = useMemo(() => {
@@ -117,7 +109,11 @@ const AdminDocuments: React.FC = () => {
 
   const handleReviewDocument = async (documentId: string, status: 'approved' | 'rejected', notes?: string) => {
     try {
-      const { error } = await supabase
+      const document = documents.find(d => d.id === documentId);
+      if (!document) return;
+
+      // Update the document status
+      const { error: docError } = await supabase
         .from('verification_documents')
         .update({
           verification_status: status,
@@ -126,7 +122,40 @@ const AdminDocuments: React.FC = () => {
         })
         .eq('id', documentId);
 
-      if (error) throw error;
+      if (docError) throw docError;
+
+      // If approved, update the corresponding profile verification flag
+      if (status === 'approved') {
+        const updates: any = {};
+        
+        // Map document types to profile verification flags
+        switch (document.document_type) {
+          case 'passport':
+          case 'national_id':
+          case 'driving_license':
+            updates.identity_verified = true;
+            break;
+          case 'proof_of_address':
+            updates.address_verified = true;
+            break;
+          case 'bank_statement':
+          case 'income_verification':
+          case 'source_of_wealth':
+            updates.financial_verified = true;
+            break;
+        }
+
+        if (Object.keys(updates).length > 0) {
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .update(updates)
+            .eq('id', document.user_id);
+
+          if (profileError) {
+            console.error('Error updating profile verification flags:', profileError);
+          }
+        }
+      }
 
       toast.success(`Document ${status} successfully`);
       fetchDocuments();
@@ -135,22 +164,6 @@ const AdminDocuments: React.FC = () => {
       console.error('Error updating document:', err);
       toast.error('Failed to update document status');
     }
-  };
-
-  const handleInitiateScreening = (userId: string, userName: string, userEmail: string, screeningType: 'pep' | 'sanctions') => {
-    setSelectedUserForScreening({
-      userId,
-      userName,
-      userEmail,
-      screeningType
-    });
-    setScreeningModalOpen(true);
-  };
-
-  const handleScreeningComplete = () => {
-    fetchDocuments();
-    setScreeningModalOpen(false);
-    setSelectedUserForScreening(null);
   };
 
   const filteredDocuments = useMemo(() => {
@@ -370,27 +383,6 @@ const AdminDocuments: React.FC = () => {
                         <Eye className="w-4 h-4 mr-1" />
                         Review
                       </Button>
-                      
-                      {doc.verification_status === 'approved' && (
-                        <>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleInitiateScreening(doc.user_id, doc.user_name, doc.user_email, 'pep')}
-                          >
-                            <Shield className="w-4 h-4 mr-1" />
-                            PEP Screen
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleInitiateScreening(doc.user_id, doc.user_name, doc.user_email, 'sanctions')}
-                          >
-                            <AlertCircle className="w-4 h-4 mr-1" />
-                            Sanctions Screen
-                          </Button>
-                        </>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -411,18 +403,6 @@ const AdminDocuments: React.FC = () => {
         />
       )}
 
-      {/* Admin Screening Modal */}
-      {selectedUserForScreening && (
-        <AdminScreeningModal
-          open={screeningModalOpen}
-          onOpenChange={setScreeningModalOpen}
-          userId={selectedUserForScreening.userId}
-          userName={selectedUserForScreening.userName}
-          userEmail={selectedUserForScreening.userEmail}
-          screeningType={selectedUserForScreening.screeningType}
-          onScreeningComplete={handleScreeningComplete}
-        />
-      )}
     </div>
   );
 };

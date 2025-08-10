@@ -116,12 +116,7 @@ const UserManagement: React.FC = () => {
           phone,
           is_accredited,
           kyc_verified,
-          created_at,
-          identity_verified,
-          address_verified,
-          financial_verified,
-          pep_screened,
-          sanctions_screened
+          created_at
         `);
 
       if (profilesError) throw profilesError;
@@ -140,6 +135,25 @@ const UserManagement: React.FC = () => {
 
       if (investmentsError) throw investmentsError;
 
+      // Fetch verification documents for each user
+      const userIds = profiles?.map(p => p.id) || [];
+      const { data: documents, error: docsError } = await supabase
+        .from('verification_documents')
+        .select('user_id, document_type, verification_status')
+        .in('user_id', userIds)
+        .eq('verification_status', 'approved');
+
+      if (docsError) throw docsError;
+
+      // Fetch compliance screening documents
+      const { data: screeningDocs, error: screeningError } = await supabase
+        .from('compliance_screening_documents')
+        .select('user_id, screening_type, status')
+        .in('user_id', userIds)
+        .eq('status', 'approved');
+
+      if (screeningError) throw screeningError;
+
       // Combine the data
       const usersWithRoles = profiles?.map(profile => {
         const roles = userRoles?.filter(role => role.user_id === profile.id).map(role => role.role) || [];
@@ -147,17 +161,29 @@ const UserManagement: React.FC = () => {
         const totalInvested = userInvestments.reduce((sum, inv) => sum + (inv.investment_amount || 0), 0);
         const activeInvestments = userInvestments.filter(inv => inv.status === 'active').length;
 
-        // Calculate verification status
-        const identity_verified = profile.identity_verified || false;
-        const address_verified = profile.address_verified || false;
-        const financial_verified = profile.financial_verified || false;
-        const pep_screened = profile.pep_screened || false;
-        const sanctions_screened = profile.sanctions_screened || false;
+        // Get approved documents for this user
+        const userDocs = documents?.filter(doc => doc.user_id === profile.id) || [];
+        const approvedDocTypes = new Set(userDocs.map(doc => doc.document_type));
+        
+        // Check verification status
+        const hasIdentityDoc = approvedDocTypes.has('passport') || 
+                              approvedDocTypes.has('national_id') || 
+                              approvedDocTypes.has('driving_license');
+        const hasAddressDoc = approvedDocTypes.has('proof_of_address');
+        const hasFinancialDoc = approvedDocTypes.has('bank_statement') || 
+                               approvedDocTypes.has('income_verification') || 
+                               approvedDocTypes.has('source_of_wealth');
+
+        // Get screening status
+        const userScreenings = screeningDocs?.filter(doc => doc.user_id === profile.id) || [];
+        const approvedScreenings = new Set(userScreenings.map(doc => doc.screening_type));
+        const pep_screened = approvedScreenings.has('pep');
+        const sanctions_screened = approvedScreenings.has('sanctions');
         
         const totalSteps = 5;
-        const completedSteps = [identity_verified, address_verified, financial_verified, pep_screened, sanctions_screened].filter(Boolean).length;
+        const completedSteps = [hasIdentityDoc, hasAddressDoc, hasFinancialDoc, pep_screened, sanctions_screened].filter(Boolean).length;
         const overall_progress = (completedSteps / totalSteps) * 100;
-        const can_invest = identity_verified && address_verified && financial_verified && pep_screened && sanctions_screened;
+        const can_invest = hasIdentityDoc && hasAddressDoc && hasFinancialDoc && pep_screened && sanctions_screened;
 
         return {
           ...profile,
@@ -166,9 +192,9 @@ const UserManagement: React.FC = () => {
           active_investments: activeInvestments,
           verification_status: {
             overall_progress,
-            identity_verified,
-            address_verified,
-            financial_verified,
+            identity_verified: hasIdentityDoc,
+            address_verified: hasAddressDoc,
+            financial_verified: hasFinancialDoc,
             pep_screened,
             sanctions_screened,
             can_invest
