@@ -72,47 +72,37 @@ export const AdminScreeningModal: React.FC<AdminScreeningModalProps> = ({
     setUploading(true);
 
     try {
-      // Upload file to Supabase Storage
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${userId}/${screeningType}_screening_${Date.now()}.${fileExt}`;
-      
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('verification-documents')
-        .upload(fileName, file);
+      // Call Edge Function for server-side validation and secure upload
+      const { data, error } = await supabase.functions.invoke('compliance-screening-upload', {
+        body: {
+          userId,
+          screeningType,
+          screeningProvider,
+          screeningReference,
+          expiryDate,
+          fileName: file.name,
+          fileSize: file.size,
+          mimeType: file.type,
+          notes,
+        },
+      });
 
-      if (uploadError) throw uploadError;
+      if (error) throw error;
+      if (!data?.success) throw new Error('Failed to initialize screening upload');
 
-      // Create screening document record
-      const { error: insertError } = await supabase
-        .from('compliance_screening_documents')
-        .insert({
-          user_id: userId,
-          screening_type: screeningType,
-          status: 'approved',
-          file_name: file.name,
-          file_path: fileName,
-          file_size: file.size,
-          mime_type: file.type,
-          uploaded_by: (await supabase.auth.getUser()).data.user?.id,
-          screening_provider: screeningProvider,
-          screening_reference: screeningReference,
-          expiry_date: expiryDate || null,
-          notes: notes
-        });
+      // Upload file using signed URL from Edge Function
+      const uploadResponse = await fetch(data.uploadUrl, {
+        method: 'PUT',
+        body: file,
+        headers: {
+          'Content-Type': file.type,
+          'x-upsert': 'true',
+        },
+      });
 
-      if (insertError) throw insertError;
-
-      // Update user profile with screening completion
-      const updateField = screeningType === 'pep' ? 'pep_screening_date' : 'sanctions_screening_date';
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({
-          [updateField]: new Date().toISOString().split('T')[0],
-          [`${screeningType}_screened`]: true
-        })
-        .eq('id', userId);
-
-      if (profileError) throw profileError;
+      if (!uploadResponse.ok) {
+        throw new Error('Failed to upload file to storage');
+      }
 
       toast.success(`${screeningType.toUpperCase()} screening completed successfully`);
       onScreeningComplete();
@@ -124,9 +114,9 @@ export const AdminScreeningModal: React.FC<AdminScreeningModalProps> = ({
       setScreeningReference('');
       setNotes('');
       setExpiryDate('');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error uploading screening document:', error);
-      toast.error('Failed to complete screening');
+      toast.error(error.message || 'Failed to complete screening');
     } finally {
       setUploading(false);
     }

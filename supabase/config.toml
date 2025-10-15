@@ -1,1 +1,4 @@
 project_id = "eqayhqfntpqzbpbkrkvu"
+
+[functions.compliance-screening-upload]
+verify_jwt = true
