@@ -25,6 +25,7 @@ import { useVerificationStatus } from '@/hooks/useVerificationStatus';
 import { Navigation } from '@/components/layout/Navigation';
 import { InvestmentProcessModal } from '@/components/investment/InvestmentProcessModal';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 export const OfferingDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -342,10 +343,51 @@ export const OfferingDetailsPage: React.FC = () => {
                             </div>
                           </div>
                           <div className="flex gap-2">
-                            <Button variant="outline" size="sm" onClick={() => window.open(doc.file_path, '_blank')}>
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={async () => {
+                                try {
+                                  const { data, error } = await supabase.storage
+                                    .from('offering-documents')
+                                    .createSignedUrl(doc.file_path, 60);
+                                  
+                                  if (error) throw error;
+                                  if (data?.signedUrl) {
+                                    window.open(data.signedUrl, '_blank');
+                                  }
+                                } catch (error) {
+                                  console.error('Error viewing document:', error);
+                                  toast.error('Failed to open document');
+                                }
+                              }}
+                            >
                               View
                             </Button>
-                           <Button variant="outline" size="sm">
+                           <Button 
+                             variant="outline" 
+                             size="sm"
+                             onClick={async () => {
+                               try {
+                                 const { data, error } = await supabase.storage
+                                   .from('offering-documents')
+                                   .createSignedUrl(doc.file_path, 60);
+                                 
+                                 if (error) throw error;
+                                 if (data?.signedUrl) {
+                                   const link = document.createElement('a');
+                                   link.href = data.signedUrl;
+                                   link.download = doc.title || 'document';
+                                   document.body.appendChild(link);
+                                   link.click();
+                                   document.body.removeChild(link);
+                                 }
+                               } catch (error) {
+                                 console.error('Error downloading document:', error);
+                                 toast.error('Failed to download document');
+                               }
+                             }}
+                           >
                              <Download className="h-4 w-4 mr-2" />
                              Download
                            </Button>
