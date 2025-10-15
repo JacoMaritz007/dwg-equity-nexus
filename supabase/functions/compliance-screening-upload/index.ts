@@ -1,3 +1,4 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.51.0';
 
 const corsHeaders = {
@@ -5,47 +6,51 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-Deno.serve(async (req) => {
+serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      {
+        auth: {
+          persistSession: false,
+        },
+      }
+    );
 
-    // Verify authentication
+    // Get the authorization header
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      console.error('Missing authorization header');
+      throw new Error('No authorization header');
+    }
+
+    // Verify user is authenticated
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(
+      authHeader.replace('Bearer ', '')
+    );
+
+    if (userError || !user) {
+      console.error('Auth error:', userError);
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    
-    if (authError || !user) {
-      console.error('Auth error:', authError);
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Verify admin role server-side
-    const { data: roles, error: roleError } = await supabase
+    // Verify user is admin
+    const { data: roles, error: roleError } = await supabaseClient
       .from('user_roles')
       .select('role')
       .eq('user_id', user.id)
       .eq('role', 'admin')
-      .single();
+      .maybeSingle();
 
     if (roleError || !roles) {
-      console.error('Not an admin:', roleError);
+      console.error('Not an admin:', user.id);
       return new Response(
         JSON.stringify({ error: 'Forbidden: Admin access required' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -56,166 +61,135 @@ Deno.serve(async (req) => {
       userId, 
       screeningType, 
       screeningProvider, 
-      screeningReference,
+      screeningReference, 
       expiryDate,
       fileName,
       fileSize,
       mimeType,
-      notes 
+      notes
     } = await req.json();
 
-    // Validate required fields
-    if (!userId || !screeningType || !fileName) {
-      console.error('Missing required fields');
+    // Validate inputs
+    if (!userId || !screeningType || !screeningProvider || !fileName) {
       return new Response(
-        JSON.stringify({ error: 'Missing required fields: userId, screeningType, fileName' }),
+        JSON.stringify({ error: 'Missing required fields' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     // Validate screening type
     if (!['pep', 'sanctions'].includes(screeningType)) {
-      console.error('Invalid screening type:', screeningType);
       return new Response(
-        JSON.stringify({ error: 'Invalid screening type. Must be "pep" or "sanctions"' }),
+        JSON.stringify({ error: 'Invalid screening type' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Validate file type (PDF or images only)
-    const allowedMimeTypes = [
-      'application/pdf',
-      'image/jpeg',
-      'image/jpg',
-      'image/png',
-      'image/webp'
-    ];
-    
-    if (mimeType && !allowedMimeTypes.includes(mimeType)) {
-      console.error('Invalid file type:', mimeType);
+    // Validate file type
+    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
+    if (!allowedTypes.includes(mimeType)) {
       return new Response(
-        JSON.stringify({ error: 'Invalid file type. Only PDF and images (JPEG, PNG, WEBP) are allowed' }),
+        JSON.stringify({ error: 'Invalid file type. Only PDF and images are allowed.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Validate file size (10MB limit)
-    const maxFileSize = 10 * 1024 * 1024; // 10MB
-    if (fileSize && fileSize > maxFileSize) {
-      console.error('File too large:', fileSize);
+    // Validate file size (10MB max)
+    if (fileSize > 10 * 1024 * 1024) {
       return new Response(
-        JSON.stringify({ error: 'File size exceeds 10MB limit' }),
+        JSON.stringify({ error: 'File too large. Maximum size is 10MB.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Validate expiry date is in the future
+    // Validate expiry date if provided
     if (expiryDate) {
       const expiry = new Date(expiryDate);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       
       if (expiry < today) {
-        console.error('Expiry date in the past:', expiryDate);
         return new Response(
-          JSON.stringify({ error: 'Expiry date must be in the future' }),
+          JSON.stringify({ error: 'Expiry date cannot be in the past' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
     }
 
-    // Validate screening provider is not empty
-    if (!screeningProvider || screeningProvider.trim() === '') {
-      console.error('Missing screening provider');
-      return new Response(
-        JSON.stringify({ error: 'Screening provider is required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Generate secure file path
-    const timestamp = Date.now();
-    const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
-    const filePath = `${userId}/${timestamp}_${sanitizedFileName}`;
-
-    // Create signed upload URL for client
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('compliance-screening-documents')
-      .createSignedUploadUrl(filePath);
-
-    if (uploadError) {
-      console.error('Failed to create upload URL:', uploadError);
-      return new Response(
-        JSON.stringify({ error: 'Failed to create upload URL' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Create database record with pending status
-    const { data: documentData, error: dbError } = await supabase
+    // Create file path and signed upload URL
+    const filePath = `${userId}/${Date.now()}_${fileName}`;
+    
+    // Create database record first
+    const { data: screeningDoc, error: insertError } = await supabaseClient
       .from('compliance_screening_documents')
       .insert({
         user_id: userId,
         screening_type: screeningType,
-        screening_provider: screeningProvider.trim(),
-        screening_reference: screeningReference?.trim() || null,
-        status: 'approved', // Admins can approve directly
+        screening_provider: screeningProvider,
+        screening_reference: screeningReference || null,
+        status: 'approved',
         file_path: filePath,
         file_name: fileName,
-        file_size: fileSize || null,
-        mime_type: mimeType || null,
+        file_size: fileSize,
+        mime_type: mimeType,
         expiry_date: expiryDate || null,
+        notes: notes || null,
         uploaded_by: user.id,
-        notes: notes?.trim() || null,
       })
       .select()
       .single();
 
-    if (dbError) {
-      console.error('Database error:', dbError);
+    if (insertError) {
+      console.error('Insert error:', insertError);
       return new Response(
         JSON.stringify({ error: 'Failed to create screening record' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Update profile screening status
+    // Update user profile with screening status
     const updateField = screeningType === 'pep' ? 'pep_screened' : 'sanctions_screened';
-    const dateField = screeningType === 'pep' ? 'pep_screening_date' : 'sanctions_screening_date';
-    
-    const { error: profileError } = await supabase
+    const { error: profileError } = await supabaseClient
       .from('profiles')
       .update({ 
         [updateField]: true,
-        [dateField]: new Date().toISOString().split('T')[0]
+        [`${screeningType}_screening_date`]: new Date().toISOString().split('T')[0]
       })
       .eq('id', userId);
 
     if (profileError) {
-      console.error('Failed to update profile:', profileError);
-      // Don't fail the whole operation, just log
+      console.error('Profile update error:', profileError);
     }
 
-    console.log('Screening document created successfully:', documentData.id);
+    // Generate signed upload URL
+    const { data: uploadData, error: uploadError } = await supabaseClient.storage
+      .from('compliance-screening-documents')
+      .createSignedUploadUrl(filePath);
+
+    if (uploadError) {
+      console.error('Upload URL error:', uploadError);
+      return new Response(
+        JSON.stringify({ error: 'Failed to generate upload URL' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log(`Compliance screening initiated by admin ${user.id} for user ${userId}, type: ${screeningType}`);
 
     return new Response(
-      JSON.stringify({
-        success: true,
+      JSON.stringify({ 
+        success: true, 
         uploadUrl: uploadData.signedUrl,
-        token: uploadData.token,
-        path: filePath,
-        documentId: documentData.id
+        data: screeningDoc,
+        message: 'Screening record created successfully'
       }),
-      { 
-        status: 200, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
-    console.error('Unexpected error:', error);
+    console.error('Error in compliance-screening-upload:', error);
     return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
+      JSON.stringify({ error: error.message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
