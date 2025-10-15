@@ -371,16 +371,18 @@ export const OfferingDetailsPage: React.FC = () => {
                                try {
                                  const { data, error } = await supabase.storage
                                    .from('offering-documents')
-                                   .createSignedUrl(doc.file_path, 60);
+                                   .download(doc.file_path);
                                  
                                  if (error) throw error;
-                                 if (data?.signedUrl) {
+                                 if (data) {
+                                   const url = URL.createObjectURL(data);
                                    const link = document.createElement('a');
-                                   link.href = data.signedUrl;
+                                   link.href = url;
                                    link.download = doc.title || 'document';
                                    document.body.appendChild(link);
                                    link.click();
                                    document.body.removeChild(link);
+                                   URL.revokeObjectURL(url);
                                  }
                                } catch (error) {
                                  console.error('Error downloading document:', error);
