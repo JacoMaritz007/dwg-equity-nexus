@@ -36,6 +36,8 @@ export const OfferingDetailsPage: React.FC = () => {
   const [offering, setOffering] = useState<InvestmentOfferingWithDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [showInvestmentModal, setShowInvestmentModal] = useState(false);
+  const [featuredImageError, setFeaturedImageError] = useState(false);
+  const [galleryImageErrors, setGalleryImageErrors] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const loadOffering = async () => {
@@ -120,15 +122,12 @@ export const OfferingDetailsPage: React.FC = () => {
           {/* Image */}
           <div className="lg:w-1/2">
             <div className="aspect-video w-full bg-muted rounded-lg overflow-hidden">
-              {offering.offering_media?.find(media => media.media_type === 'featured_image')?.file_path ? (
+              {offering.offering_media?.find(media => media.media_type === 'featured_image')?.file_path && !featuredImageError ? (
                 <img 
                   src={`https://eqayhqfntpqzbpbkrkvu.supabase.co/storage/v1/object/public/offering-media/${offering.offering_media.find(media => media.media_type === 'featured_image')?.file_path}`}
                   alt={offering.title}
                   className="w-full h-full object-cover"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    target.parentElement!.innerHTML = '<div class="w-full h-full flex items-center justify-center bg-muted"><svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-muted-foreground"><rect width="16" height="20" x="4" y="2" rx="2" ry="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01"/><path d="M16 6h.01"/><path d="M12 6h.01"/><path d="M12 10h.01"/><path d="M12 14h.01"/><path d="M16 10h.01"/><path d="M16 14h.01"/><path d="M8 10h.01"/><path d="M8 14h.01"/></svg></div>';
-                  }}
+                  onError={() => setFeaturedImageError(true)}
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center bg-muted">
@@ -147,15 +146,22 @@ export const OfferingDetailsPage: React.FC = () => {
                     .slice(0, 6)
                     .map((media, index) => (
                       <div key={media.id} className="aspect-video bg-muted rounded overflow-hidden cursor-pointer hover:opacity-80 transition-opacity">
-                        <img 
-                          src={`https://eqayhqfntpqzbpbkrkvu.supabase.co/storage/v1/object/public/offering-media/${media.file_path}`}
-                          alt={`${offering.title} gallery ${index + 1}`}
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            target.parentElement!.innerHTML = '<div class="w-full h-full flex items-center justify-center bg-muted"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-muted-foreground"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg></div>';
-                          }}
-                        />
+                        {!galleryImageErrors[media.id] ? (
+                          <img 
+                            src={`https://eqayhqfntpqzbpbkrkvu.supabase.co/storage/v1/object/public/offering-media/${media.file_path}`}
+                            alt={`${offering.title} gallery ${index + 1}`}
+                            className="w-full h-full object-cover"
+                            onError={() => setGalleryImageErrors(prev => ({ ...prev, [media.id]: true }))}
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center bg-muted">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground">
+                              <rect width="18" height="18" x="3" y="3" rx="2" ry="2"/>
+                              <circle cx="9" cy="9" r="2"/>
+                              <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>
+                            </svg>
+                          </div>
+                        )}
                       </div>
                     ))}
                 </div>
