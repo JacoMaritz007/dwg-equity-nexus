@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db/client.js";
 import { profiles, userRoles } from "../db/schema.js";
-import { canViewProfile, assertCanUpdateProfile, AuthzError } from "../authz/policies.js";
+import { canViewProfile, assertCanUpdateProfile, assertAdmin, AuthzError } from "../authz/policies.js";
 
 const bootstrapSchema = z.object({
   firstName: z.string().min(1),
@@ -57,6 +57,16 @@ const profilesRoutes: FastifyPluginAsync = async (fastify) => {
     await db.insert(userRoles).values({ userId: uid, role: "investor" });
 
     reply.code(201).send(profile);
+  });
+
+  // "Admins can view all profiles" (migration 20251015140915, added to fix
+  // the original MISSING_RLS finding — see SECURITY_REVIEW_FINDINGS.md in
+  // the legacy repo). Used by the admin User Management and Document
+  // Review pages to join user names/emails onto their own data.
+  fastify.get("/profiles", async (request, reply) => {
+    assertAdmin(request.actor);
+    const all = await db.query.profiles.findMany();
+    reply.send(all);
   });
 
   fastify.get<{ Params: { id: string } }>("/profiles/:id", async (request, reply) => {

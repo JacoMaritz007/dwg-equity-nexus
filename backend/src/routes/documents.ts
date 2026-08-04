@@ -12,6 +12,11 @@ import {
 } from "../authz/policies.js";
 import { getSignedReadUrl, getSignedUploadUrl, userScopedPath } from "../storage/signed-urls.js";
 
+// Note: list routes below return the raw `filePath`, not a signed URL.
+// Every current frontend consumer signs on demand at preview/download time
+// via POST /storage/signed-url (generic, path-based) or the
+// /download-url routes below (ID-based) — see useDocuments.ts. Eagerly
+// signing every row in a list would be wasted work for rows never opened.
 const documentsRoutes: FastifyPluginAsync = async (fastify) => {
   // --- generic documents (offering_document/legal_agreement/etc) -----------
   fastify.get("/documents", async (request, reply) => {
@@ -75,6 +80,17 @@ const documentsRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   // --- offering_documents (investment memoranda etc, gated to verified investors) --
+  fastify.post<{ Params: { id: string } }>(
+    "/offerings/:id/documents/upload-url",
+    async (request, reply) => {
+      assertCanManageOfferingDocuments(request.actor);
+      const body = z.object({ fileName: z.string(), contentType: z.string() }).parse(request.body);
+      const filePath = `${request.params.id}/${Date.now()}_${body.fileName}`;
+      const url = await getSignedUploadUrl("offeringDocuments", filePath, body.contentType);
+      reply.send({ url, filePath });
+    },
+  );
+
   fastify.get<{ Params: { id: string } }>(
     "/offerings/:id/documents",
     async (request, reply) => {

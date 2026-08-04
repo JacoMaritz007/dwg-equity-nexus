@@ -16,6 +16,10 @@ const createInvestmentSchema = z.object({
   offeringId: z.string().uuid(),
   investmentAmount: z.string(),
   shares: z.string().optional(),
+  // Frontend sends 'pending' for a fresh application still going through
+  // due-diligence/esign/funding (see InvestmentProcessModal.tsx); defaults
+  // to the schema's 'active' otherwise.
+  status: z.string().optional(),
 });
 
 const investmentsRoutes: FastifyPluginAsync = async (fastify) => {

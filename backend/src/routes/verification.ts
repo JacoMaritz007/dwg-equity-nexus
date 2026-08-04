@@ -2,7 +2,7 @@ import type { FastifyPluginAsync } from "fastify";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db/client.js";
-import { verificationDocuments, verificationHistory } from "../db/schema.js";
+import { verificationDocuments, verificationHistory, profiles } from "../db/schema.js";
 import {
   canViewVerificationDocument,
   assertCanUploadVerificationDocument,
@@ -25,6 +25,9 @@ const DOC_TYPES = [
 ] as const;
 
 const verificationRoutes: FastifyPluginAsync = async (fastify) => {
+  // Returns raw filePath, not a signed URL — every current frontend
+  // consumer signs on demand at preview/download time (POST
+  // /storage/signed-url, or the ID-based /download-url route below).
   fastify.get("/verification-documents", async (request, reply) => {
     const all = await db.query.verificationDocuments.findMany();
     reply.send(all.filter((d) => canViewVerificationDocument(request.actor, d.userId)));
@@ -81,6 +84,16 @@ const verificationRoutes: FastifyPluginAsync = async (fastify) => {
   // Admin review action. Replaces the old log_verification_change() Postgres
   // trigger: we write the verification_history row explicitly, in the same
   // request, instead of relying on a trigger firing on UPDATE.
+  //
+  // Also flips the matching profiles.*_verified flag when approved — the
+  // original app tried to do this via a second client-side
+  // supabase.from('profiles').update(...) call, but the profiles UPDATE RLS
+  // policy only ever allowed `auth.uid() = id` (no admin exception), so
+  // that call was silently rejected in production and the error just
+  // logged, never surfaced. No user could ever actually complete
+  // verification through the admin review flow. Doing it here, atomically,
+  // as part of the review itself (which IS admin-authorized) fixes it for
+  // real rather than reproducing the same broken permission gap.
   fastify.post<{ Params: { id: string } }>(
     "/verification-documents/:id/review",
     async (request, reply) => {
@@ -117,6 +130,22 @@ const verificationRoutes: FastifyPluginAsync = async (fastify) => {
         changedBy: request.actor.uid,
         changeReason: body.notes ?? "Status updated",
       });
+
+      if (body.status === "approved") {
+        const identityTypes = ["passport", "national_id", "driving_license"];
+        const financialTypes = ["bank_statement", "income_verification", "source_of_wealth"];
+        const flagUpdates: Partial<typeof profiles.$inferInsert> = {};
+        if (identityTypes.includes(doc.documentType)) flagUpdates.identityVerified = true;
+        else if (doc.documentType === "proof_of_address") flagUpdates.addressVerified = true;
+        else if (financialTypes.includes(doc.documentType)) flagUpdates.financialVerified = true;
+
+        if (Object.keys(flagUpdates).length > 0) {
+          await db
+            .update(profiles)
+            .set({ ...flagUpdates, updatedAt: new Date() })
+            .where(eq(profiles.id, doc.userId));
+        }
+      }
 
       reply.send(updated);
     },
