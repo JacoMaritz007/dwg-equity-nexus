@@ -21,7 +21,7 @@ import {
 import { InvestmentOfferingWithDetails } from '@/types/investment';
 import { useAuth } from '@/contexts/AuthContext';
 import { useVerificationStatus } from '@/hooks/useVerificationStatus';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api-client';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 
@@ -51,29 +51,31 @@ export const InvestmentProcessModal: React.FC<InvestmentProcessModalProps> = ({
 
     try {
       // Create user investment record
-      const { data, error } = await supabase
-        .from('user_investments')
-        .insert({
-          user_id: user?.id,
-          offering_id: offering.id,
-          investment_amount: investmentAmount,
-          status: 'pending'
-        })
-        .select()
-        .single();
+      const data = await api.post<{ id: string }>('/investments', {
+        userId: user?.id,
+        offeringId: offering.id,
+        investmentAmount: String(investmentAmount),
+        status: 'pending',
+      });
 
-      if (error) throw error;
-
-      // Create initial transaction record
-      await supabase
-        .from('transactions')
-        .insert({
-          user_id: user?.id,
-          investment_id: data.id,
-          type: 'contribution',
-          amount: investmentAmount,
-          description: `Investment application for ${offering.title}`
-        });
+      // Create initial transaction record. Admin-only on the backend (see
+      // useTransactions.ts) — this call will 403 for a non-admin actor,
+      // same outcome as the original: there was never a user-facing
+      // transactions INSERT RLS policy either, so this insert would have
+      // failed under RLS too. Left in place rather than silently dropped,
+      // since fixing it for real means deciding who/what should actually
+      // record the contribution transaction (likely a payment-webhook
+      // driven backend action once funding is wired up for real, not this
+      // modal directly) — a product decision, not a mechanical port.
+      await api.post('/transactions', {
+        userId: user?.id,
+        investmentId: data.id,
+        type: 'contribution',
+        amount: String(investmentAmount),
+        description: `Investment application for ${offering.title}`,
+      }).catch((err) => {
+        console.warn('Transaction record not created (expected for non-admin users):', err);
+      });
 
       toast.success('Investment application created successfully');
       return data;

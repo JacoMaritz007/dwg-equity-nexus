@@ -25,7 +25,7 @@ import { useVerificationStatus } from '@/hooks/useVerificationStatus';
 import { Navigation } from '@/components/layout/Navigation';
 import { InvestmentProcessModal } from '@/components/investment/InvestmentProcessModal';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
+import { useDocuments } from '@/hooks/useDocuments';
 
 export const OfferingDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -33,6 +33,7 @@ export const OfferingDetailsPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const { fetchOfferingById } = useInvestmentOfferings();
   const { status: verificationStatus } = useVerificationStatus();
+  const { getSignedUrl, downloadDocument } = useDocuments();
   const [offering, setOffering] = useState<InvestmentOfferingWithDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [showInvestmentModal, setShowInvestmentModal] = useState(false);
@@ -122,9 +123,9 @@ export const OfferingDetailsPage: React.FC = () => {
           {/* Image */}
           <div className="lg:w-1/2">
             <div className="aspect-video w-full bg-muted rounded-lg overflow-hidden">
-              {offering.offering_media?.find(media => media.media_type === 'featured_image')?.file_path && !featuredImageError ? (
-                <img 
-                  src={`https://eqayhqfntpqzbpbkrkvu.supabase.co/storage/v1/object/public/offering-media/${offering.offering_media.find(media => media.media_type === 'featured_image')?.file_path}`}
+              {offering.offering_media?.find(media => media.media_type === 'featured_image')?.url && !featuredImageError ? (
+                <img
+                  src={offering.offering_media.find(media => media.media_type === 'featured_image')?.url}
                   alt={offering.title}
                   className="w-full h-full object-cover"
                   onError={() => setFeaturedImageError(true)}
@@ -147,8 +148,8 @@ export const OfferingDetailsPage: React.FC = () => {
                     .map((media, index) => (
                       <div key={media.id} className="aspect-video bg-muted rounded overflow-hidden cursor-pointer hover:opacity-80 transition-opacity">
                         {!galleryImageErrors[media.id] ? (
-                          <img 
-                            src={`https://eqayhqfntpqzbpbkrkvu.supabase.co/storage/v1/object/public/offering-media/${media.file_path}`}
+                          <img
+                            src={media.url}
                             alt={`${offering.title} gallery ${index + 1}`}
                             className="w-full h-full object-cover"
                             onError={() => setGalleryImageErrors(prev => ({ ...prev, [media.id]: true }))}
@@ -349,52 +350,24 @@ export const OfferingDetailsPage: React.FC = () => {
                             </div>
                           </div>
                           <div className="flex gap-2">
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
+                            <Button
+                              variant="outline"
+                              size="sm"
                               onClick={async () => {
-                                try {
-                                  const { data, error } = await supabase.storage
-                                    .from('offering-documents')
-                                    .createSignedUrl(doc.file_path, 60);
-                                  
-                                  if (error) throw error;
-                                  if (data?.signedUrl) {
-                                    window.open(data.signedUrl, '_blank');
-                                  }
-                                } catch (error) {
-                                  console.error('Error viewing document:', error);
+                                const url = await getSignedUrl(doc.file_path, 'offering-documents');
+                                if (url) {
+                                  window.open(url, '_blank');
+                                } else {
                                   toast.error('Failed to open document');
                                 }
                               }}
                             >
                               View
                             </Button>
-                           <Button 
-                             variant="outline" 
+                           <Button
+                             variant="outline"
                              size="sm"
-                             onClick={async () => {
-                               try {
-                                 const { data, error } = await supabase.storage
-                                   .from('offering-documents')
-                                   .download(doc.file_path);
-                                 
-                                 if (error) throw error;
-                                 if (data) {
-                                   const url = URL.createObjectURL(data);
-                                   const link = document.createElement('a');
-                                   link.href = url;
-                                   link.download = doc.title || 'document';
-                                   document.body.appendChild(link);
-                                   link.click();
-                                   document.body.removeChild(link);
-                                   URL.revokeObjectURL(url);
-                                 }
-                               } catch (error) {
-                                 console.error('Error downloading document:', error);
-                                 toast.error('Failed to download document');
-                               }
-                             }}
+                             onClick={() => downloadDocument(doc.file_path, doc.title || 'document')}
                            >
                              <Download className="h-4 w-4 mr-2" />
                              Download

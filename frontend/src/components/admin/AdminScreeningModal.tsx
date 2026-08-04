@@ -18,7 +18,7 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api-client';
 
 interface AdminScreeningModalProps {
   open: boolean;
@@ -72,37 +72,39 @@ export const AdminScreeningModal: React.FC<AdminScreeningModalProps> = ({
     setUploading(true);
 
     try {
-      // Call Edge Function for server-side validation and secure upload
-      const { data, error } = await supabase.functions.invoke('compliance-screening-upload', {
-        body: {
-          userId,
-          screeningType,
-          screeningProvider,
-          screeningReference,
-          expiryDate,
-          fileName: file.name,
-          fileSize: file.size,
-          mimeType: file.type,
-          notes,
-        },
+      // Two-step flow, split for a reason: the old Supabase Edge Function
+      // marked the screening record 'approved' (and flipped the profile's
+      // pep_screened/sanctions_screened flag) BEFORE the file upload even
+      // happened — a failed or abandoned upload still left the user marked
+      // as screened with nothing behind it. The backend now only does that
+      // after /confirm-upload, once the upload below has actually
+      // succeeded (see backend/src/routes/compliance.ts).
+      const { uploadUrl, data } = await api.post<{
+        uploadUrl: string;
+        data: { id: string };
+      }>('/compliance-screening/initiate', {
+        userId,
+        screeningType,
+        screeningProvider,
+        screeningReference: screeningReference || undefined,
+        expiryDate: expiryDate || undefined,
+        fileName: file.name,
+        fileSize: file.size,
+        mimeType: file.type,
+        notes: notes || undefined,
       });
 
-      if (error) throw error;
-      if (!data?.success) throw new Error('Failed to initialize screening upload');
-
-      // Upload file using signed URL from Edge Function
-      const uploadResponse = await fetch(data.uploadUrl, {
+      const uploadResponse = await fetch(uploadUrl, {
         method: 'PUT',
         body: file,
-        headers: {
-          'Content-Type': file.type,
-          'x-upsert': 'true',
-        },
+        headers: { 'Content-Type': file.type },
       });
 
       if (!uploadResponse.ok) {
         throw new Error('Failed to upload file to storage');
       }
+
+      await api.post(`/compliance-screening/${data.id}/confirm-upload`);
 
       toast.success(`${screeningType.toUpperCase()} screening completed successfully`);
       onScreeningComplete();

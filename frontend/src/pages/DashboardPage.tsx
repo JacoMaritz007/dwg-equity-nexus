@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api-client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -119,27 +119,17 @@ export const DashboardPage: React.FC = () => {
     if (!user) return;
 
     try {
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select(`
-          is_accredited,
-          kyc_verified,
-          verification_status,
-          investor_classification,
-          is_pep,
-          pep_screening_date,
-          sanctions_screening_date
-        `)
-        .eq('id', user.id)
-        .single();
-
-      if (error) throw error;
+      const profile = await api.get<{
+        isAccredited: boolean | null;
+        kycVerified: boolean | null;
+        verificationStatus: string | null;
+      }>(`/profiles/${user.id}`);
 
       // Calculate verification status based on existing data
-      const identityVerified = profile?.verification_status === 'approved';
-      const addressVerified = profile?.verification_status === 'approved';
-      const financialVerified = profile?.verification_status === 'approved' && profile?.is_accredited;
-      const kycCompleted = profile?.kyc_verified || false;
+      const identityVerified = profile?.verificationStatus === 'approved';
+      const addressVerified = profile?.verificationStatus === 'approved';
+      const financialVerified = profile?.verificationStatus === 'approved' && Boolean(profile?.isAccredited);
+      const kycCompleted = profile?.kycVerified || false;
 
       const verifications = [
         identityVerified,

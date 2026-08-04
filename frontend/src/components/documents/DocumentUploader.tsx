@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
-import { supabase } from '@/integrations/supabase/client';
+import { api, uploadFile as putFileToSignedUrl } from '@/lib/api-client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Upload, X, FileText, CheckCircle } from 'lucide-react';
@@ -70,17 +70,19 @@ export const DocumentUploader: React.FC<DocumentUploaderProps> = ({
     setSelectedFiles(prev => prev.filter((_, i) => i !== index));
   };
 
+  // Two-step upload: ask the backend for a signed upload URL (it decides
+  // the storage path, scoped to the caller's own uid — see
+  // userScopedPath in backend/src/storage/signed-urls.ts), PUT the file
+  // directly to Cloud Storage, then return the path for the DB row.
   const uploadFile = async (file: File): Promise<string | null> => {
     try {
       const fileExt = file.name.split('.').pop();
-      const fileName = `${user?.id}/${documentType}_${Date.now()}.${fileExt}`;
-      
-      const { data, error } = await supabase.storage
-        .from('verification-documents')
-        .upload(fileName, file);
-
-      if (error) throw error;
-      return data.path;
+      const { url, filePath } = await api.post<{ url: string; filePath: string }>(
+        '/verification-documents/upload-url',
+        { fileName: `${documentType}_${Date.now()}.${fileExt}`, contentType: file.type },
+      );
+      await putFileToSignedUrl(url, file);
+      return filePath;
     } catch (error) {
       console.error('Error uploading file:', error);
       return null;
@@ -131,20 +133,14 @@ export const DocumentUploader: React.FC<DocumentUploaderProps> = ({
         );
 
         // Save to database
-        const { error: dbError } = await supabase
-          .from('verification_documents')
-          .insert({
-            user_id: user.id,
-            document_type: documentType as any,
-            title: title || file.name,
-            file_path: filePath,
-            file_name: file.name,
-            file_size: file.size,
-            mime_type: file.type,
-            verification_status: 'pending'
-          });
-
-        if (dbError) throw dbError;
+        await api.post('/verification-documents', {
+          documentType,
+          title: title || file.name,
+          filePath,
+          fileName: file.name,
+          fileSize: file.size,
+          mimeType: file.type,
+        });
 
         // Update to success
         setUploadingFiles(prev => 

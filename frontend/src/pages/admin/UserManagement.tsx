@@ -26,7 +26,7 @@ import {
 } from '@/components/ui/table';
 import { AdminScreeningModal } from '@/components/admin/AdminScreeningModal';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api-client';
 import { 
   Search, 
   MoreHorizontal, 
@@ -104,89 +104,62 @@ const UserManagement: React.FC = () => {
   const fetchUsers = async () => {
     try {
       setIsLoading(true);
-      
-      // Fetch user profiles with their roles
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select(`
-          id,
-          first_name,
-          last_name,
-          email,
-          phone,
-          is_accredited,
-          kyc_verified,
-          created_at
-        `);
 
-      if (profilesError) throw profilesError;
+      // Five separate calls, joined client-side — same shape as the
+      // original, just against the new API. All five are admin-scoped
+      // (GET /profiles, /user-roles are admin-only; /investments,
+      // /verification-documents, /compliance-screening return every row to
+      // an admin actor — see backend/authz/policies.ts).
+      const [profiles, userRoles, investments, documents, screeningDocs] = await Promise.all([
+        api.get<Record<string, unknown>[]>('/profiles'),
+        api.get<{ userId: string; role: string }[]>('/user-roles'),
+        api.get<{ userId: string; investmentAmount: string; status: string | null }[]>('/investments'),
+        api.get<{ userId: string; documentType: string; verificationStatus: string }[]>(
+          '/verification-documents',
+        ),
+        api.get<{ userId: string; screeningType: string; status: string }[]>('/compliance-screening'),
+      ]);
 
-      // Fetch user roles
-      const { data: userRoles, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('user_id, role');
+      const usersWithRoles: UserProfile[] = profiles.map((profile) => {
+        const id = profile.id as string;
+        const roles = userRoles.filter((r) => r.userId === id).map((r) => r.role);
+        const userInvestments = investments.filter((inv) => inv.userId === id);
+        const totalInvested = userInvestments.reduce((sum, inv) => sum + Number(inv.investmentAmount || 0), 0);
+        const activeInvestments = userInvestments.filter((inv) => inv.status === 'active').length;
 
-      if (rolesError) throw rolesError;
-
-      // Fetch investment totals
-      const { data: investments, error: investmentsError } = await supabase
-        .from('user_investments')
-        .select('user_id, investment_amount, status');
-
-      if (investmentsError) throw investmentsError;
-
-      // Fetch verification documents for each user
-      const userIds = profiles?.map(p => p.id) || [];
-      const { data: documents, error: docsError } = await supabase
-        .from('verification_documents')
-        .select('user_id, document_type, verification_status')
-        .in('user_id', userIds)
-        .eq('verification_status', 'approved');
-
-      if (docsError) throw docsError;
-
-      // Fetch compliance screening documents
-      const { data: screeningDocs, error: screeningError } = await supabase
-        .from('compliance_screening_documents')
-        .select('user_id, screening_type, status')
-        .in('user_id', userIds)
-        .eq('status', 'approved');
-
-      if (screeningError) throw screeningError;
-
-      // Combine the data
-      const usersWithRoles = profiles?.map(profile => {
-        const roles = userRoles?.filter(role => role.user_id === profile.id).map(role => role.role) || [];
-        const userInvestments = investments?.filter(inv => inv.user_id === profile.id) || [];
-        const totalInvested = userInvestments.reduce((sum, inv) => sum + (inv.investment_amount || 0), 0);
-        const activeInvestments = userInvestments.filter(inv => inv.status === 'active').length;
-
-        // Get approved documents for this user
-        const userDocs = documents?.filter(doc => doc.user_id === profile.id) || [];
-        const approvedDocTypes = new Set(userDocs.map(doc => doc.document_type));
-        
-        // Check verification status
-        const hasIdentityDoc = approvedDocTypes.has('passport') || 
-                              approvedDocTypes.has('national_id') || 
-                              approvedDocTypes.has('driving_license');
+        const approvedDocTypes = new Set(
+          documents.filter((d) => d.userId === id && d.verificationStatus === 'approved').map((d) => d.documentType),
+        );
+        const hasIdentityDoc =
+          approvedDocTypes.has('passport') ||
+          approvedDocTypes.has('national_id') ||
+          approvedDocTypes.has('driving_license');
         const hasAddressDoc = approvedDocTypes.has('proof_of_address');
-        const hasFinancialDoc = approvedDocTypes.has('bank_statement') || 
-                               approvedDocTypes.has('income_verification') || 
-                               approvedDocTypes.has('source_of_wealth');
+        const hasFinancialDoc =
+          approvedDocTypes.has('bank_statement') ||
+          approvedDocTypes.has('income_verification') ||
+          approvedDocTypes.has('source_of_wealth');
 
-        // Get screening status
-        const userScreenings = screeningDocs?.filter(doc => doc.user_id === profile.id) || [];
-        const approvedScreenings = new Set(userScreenings.map(doc => doc.screening_type));
+        const approvedScreenings = new Set(
+          screeningDocs.filter((d) => d.userId === id && d.status === 'approved').map((d) => d.screeningType),
+        );
         const pep_screened = approvedScreenings.has('pep');
         const sanctions_screened = approvedScreenings.has('sanctions');
-        
+
         const totalSteps = 5;
         const completedSteps = [hasIdentityDoc, hasAddressDoc, hasFinancialDoc, pep_screened, sanctions_screened].filter(Boolean).length;
         const overall_progress = (completedSteps / totalSteps) * 100;
         const can_invest = hasIdentityDoc && hasAddressDoc && hasFinancialDoc && pep_screened && sanctions_screened;
 
         return {
-          ...profile,
+          id,
+          first_name: profile.firstName as string | null,
+          last_name: profile.lastName as string | null,
+          email: profile.email as string | null,
+          phone: profile.phone as string | null,
+          is_accredited: Boolean(profile.isAccredited),
+          kyc_verified: Boolean(profile.kycVerified),
+          created_at: profile.createdAt as string,
           roles,
           total_invested: totalInvested,
           active_investments: activeInvestments,
@@ -200,7 +173,7 @@ const UserManagement: React.FC = () => {
             can_invest
           }
         };
-      }) || [];
+      });
 
       setUsers(usersWithRoles);
     } catch (error) {
@@ -218,18 +191,9 @@ const UserManagement: React.FC = () => {
   const updateUserRole = async (userId: string, role: 'admin' | 'investor', action: 'add' | 'remove') => {
     try {
       if (action === 'add') {
-        const { error } = await supabase
-          .from('user_roles')
-          .insert({ user_id: userId, role });
-        
-        if (error) throw error;
+        await api.post('/user-roles', { userId, role });
       } else {
-        const { error } = await supabase
-          .from('user_roles')
-          .delete()
-          .match({ user_id: userId, role });
-        
-        if (error) throw error;
+        await api.delete('/user-roles', { userId, role });
       }
 
       toast({
@@ -250,12 +214,11 @@ const UserManagement: React.FC = () => {
 
   const toggleKYCStatus = async (userId: string, currentStatus: boolean) => {
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ kyc_verified: !currentStatus })
-        .eq('id', userId);
-
-      if (error) throw error;
+      // Dedicated admin endpoint, not a direct profiles update — see the
+      // comment on POST /profiles/:id/kyc-status in backend/src/routes/admin.ts
+      // for why (the original app's direct profiles.update() call here was
+      // silently rejected by RLS for any admin acting on someone else's row).
+      await api.post(`/profiles/${userId}/kyc-status`, { kycVerified: !currentStatus });
 
       toast({
         title: "Success",

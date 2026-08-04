@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { usePermissions } from '@/hooks/usePermissions';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api-client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -50,46 +50,50 @@ const AdminDocuments: React.FC = () => {
   const fetchDocuments = useCallback(async () => {
     try {
       setLoading(true);
-      
-      // Fetch verification documents with user information
-      const { data, error } = await supabase
-        .from('verification_documents')
-        .select(`
-          *,
-          profiles!inner(
-            email,
-            first_name,
-            last_name
-          )
-        `)
-        .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      // No joined query on the backend (yet) — two calls, joined
+      // client-side. Both are admin-only and return every row (see
+      // backend/authz/policies.ts canViewVerificationDocument / GET /profiles).
+      const [docs, allProfiles] = await Promise.all([
+        api.get<Record<string, unknown>[]>('/verification-documents'),
+        api.get<Record<string, unknown>[]>('/profiles'),
+      ]);
 
-      const formattedDocs = data?.map(doc => {
-        const profile = doc.profiles as any;
-        const firstName = profile?.first_name?.trim() || '';
-        const lastName = profile?.last_name?.trim() || '';
-        const email = profile?.email || 'Unknown';
-        
-        // Create display name with fallback to email if no names available
-        let displayName = '';
-        if (firstName && lastName) {
-          displayName = `${firstName} ${lastName}`;
-        } else if (firstName) {
-          displayName = firstName;
-        } else if (lastName) {
-          displayName = lastName;
-        } else {
-          displayName = email;
-        }
-        
-        return {
-          ...doc,
-          user_email: email,
-          user_name: displayName
-        };
-      }) || [];
+      const profileById = new Map(allProfiles.map((p) => [p.id as string, p]));
+
+      const formattedDocs: VerificationDocumentWithUser[] = docs
+        .map((doc) => {
+          const profile = profileById.get(doc.userId as string);
+          const firstName = ((profile?.firstName as string) || '').trim();
+          const lastName = ((profile?.lastName as string) || '').trim();
+          const email = (profile?.email as string) || 'Unknown';
+
+          let displayName = '';
+          if (firstName && lastName) displayName = `${firstName} ${lastName}`;
+          else if (firstName) displayName = firstName;
+          else if (lastName) displayName = lastName;
+          else displayName = email;
+
+          return {
+            id: doc.id as string,
+            title: doc.title as string,
+            document_type: doc.documentType as string,
+            file_path: doc.filePath as string,
+            file_name: doc.fileName as string,
+            file_size: doc.fileSize as number | undefined,
+            mime_type: doc.mimeType as string | undefined,
+            verification_status: doc.verificationStatus as string,
+            reviewer_notes: doc.reviewerNotes as string | undefined,
+            created_at: doc.createdAt as string,
+            updated_at: doc.updatedAt as string,
+            expiry_date: doc.expiryDate as string | undefined,
+            is_expired: Boolean(doc.isExpired),
+            user_id: doc.userId as string,
+            user_email: email,
+            user_name: displayName,
+          };
+        })
+        .sort((a, b) => b.created_at.localeCompare(a.created_at));
 
       setDocuments(formattedDocs);
     } catch (err) {
@@ -109,53 +113,12 @@ const AdminDocuments: React.FC = () => {
 
   const handleReviewDocument = async (documentId: string, status: 'approved' | 'rejected', notes?: string) => {
     try {
-      const document = documents.find(d => d.id === documentId);
-      if (!document) return;
-
-      // Update the document status
-      const { error: docError } = await supabase
-        .from('verification_documents')
-        .update({
-          verification_status: status,
-          reviewer_notes: notes,
-          reviewed_at: new Date().toISOString()
-        })
-        .eq('id', documentId);
-
-      if (docError) throw docError;
-
-      // If approved, update the corresponding profile verification flag
-      if (status === 'approved') {
-        const updates: any = {};
-        
-        // Map document types to profile verification flags
-        switch (document.document_type) {
-          case 'passport':
-          case 'national_id':
-          case 'driving_license':
-            updates.identity_verified = true;
-            break;
-          case 'proof_of_address':
-            updates.address_verified = true;
-            break;
-          case 'bank_statement':
-          case 'income_verification':
-          case 'source_of_wealth':
-            updates.financial_verified = true;
-            break;
-        }
-
-        if (Object.keys(updates).length > 0) {
-          const { error: profileError } = await supabase
-            .from('profiles')
-            .update(updates)
-            .eq('id', document.user_id);
-
-          if (profileError) {
-            console.error('Error updating profile verification flags:', profileError);
-          }
-        }
-      }
+      // The backend's /review endpoint handles both the status update AND
+      // (when approved) flipping the matching profiles.*_verified flag,
+      // atomically, as an admin-authorized action — see the comment on
+      // that route in backend/src/routes/verification.ts for why this
+      // moved server-side rather than staying a second client-side call.
+      await api.post(`/verification-documents/${documentId}/review`, { status, notes });
 
       toast.success(`Document ${status} successfully`);
       fetchDocuments();

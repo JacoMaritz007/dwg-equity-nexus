@@ -1,16 +1,22 @@
 import { InvestmentOfferingWithDetails, OfferingDisplayData } from '@/types/investment';
-import { supabase } from '@/integrations/supabase/client';
 
-// Utility function to get Supabase storage public URL
+// The 'offering-media' bucket is private now (org policy blocks public
+// buckets — see backend/README.md), so there's no synchronous public-URL
+// construction possible anymore. The backend pre-signs media URLs
+// server-side before returning offering data (see
+// backend/src/routes/offerings.ts's withSignedMediaUrls) — by the time a
+// media object reaches this function, `filePath`/`url` IS already the
+// usable (signed, time-limited) URL. This helper just handles the
+// already-a-URL / missing-value cases.
 export const getStorageUrl = (filePath: string): string => {
   if (!filePath) return '/api/placeholder/400/250';
-  
-  // If it's already a full URL, return as is
   if (filePath.startsWith('http')) return filePath;
-  
-  // Generate Supabase storage public URL
-  const { data } = supabase.storage.from('offering-media').getPublicUrl(filePath);
-  return data.publicUrl || '/api/placeholder/400/250';
+  // No filePath-to-URL construction is possible client-side anymore; if we
+  // get here, the caller passed a bare storage path instead of the
+  // pre-signed URL the API already provides — that's a bug upstream, not
+  // something to paper over here.
+  console.warn('getStorageUrl received an un-signed path; the API should have signed it already:', filePath);
+  return '/api/placeholder/400/250';
 };
 
 export const transformOfferingForDisplay = (offering: InvestmentOfferingWithDetails): OfferingDisplayData => {
@@ -38,16 +44,20 @@ export const transformOfferingForDisplay = (offering: InvestmentOfferingWithDeta
       media.media_type === 'featured_image'
     );
     
-    if (featuredImage && (featuredImage.file_path || featuredImage.url)) {
-      primaryImage = getStorageUrl(featuredImage.file_path || featuredImage.url);
+    // `url` is preferred over `file_path`: the backend fills `url` with a
+    // pre-signed, directly-usable URL when a filePath exists (see
+    // getStorageUrl's comment) — `file_path` alone is just the raw storage
+    // path and isn't renderable on its own anymore.
+    if (featuredImage && (featuredImage.url || featuredImage.file_path)) {
+      primaryImage = getStorageUrl(featuredImage.url || featuredImage.file_path);
     } else {
       // Fallback to first image ordered by display_order
       const firstImage = offering.offering_media
         .filter(media => media.media_type === 'image' || media.media_type === 'featured_image')
         .sort((a, b) => (a.display_order || 0) - (b.display_order || 0))[0];
-      
-      if (firstImage && (firstImage.file_path || firstImage.url)) {
-        primaryImage = getStorageUrl(firstImage.file_path || firstImage.url);
+
+      if (firstImage && (firstImage.url || firstImage.file_path)) {
+        primaryImage = getStorageUrl(firstImage.url || firstImage.file_path);
       }
     }
   }

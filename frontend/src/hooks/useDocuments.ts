@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { useState } from 'react';
+import { useEffect } from 'react';
+import { api } from '@/lib/api-client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
@@ -31,6 +32,18 @@ export interface VerificationDocument {
   is_expired: boolean;
 }
 
+// bucketName kept as the original kebab-case bucket names for call-site
+// compatibility (VerificationDocumentCard.tsx, DocumentReviewModal.tsx,
+// DocumentCard.tsx already call getSignedUrl(path, bucketName) on demand,
+// at preview/download time, working from the RAW `file_path` these hooks
+// return — mirroring exactly how they worked against Supabase Storage).
+// Mapped to the backend's camelCase bucket keys at this boundary.
+type BucketName = 'offering-documents' | 'verification-documents';
+const BUCKET_MAP: Record<BucketName, 'offeringDocuments' | 'verificationDocuments'> = {
+  'offering-documents': 'offeringDocuments',
+  'verification-documents': 'verificationDocuments',
+};
+
 export const useDocuments = () => {
   const { user } = useAuth();
   const [investmentDocuments, setInvestmentDocuments] = useState<Document[]>([]);
@@ -43,53 +56,37 @@ export const useDocuments = () => {
     if (!user?.id) return;
 
     try {
-      // Get user's investments first
-      const { data: investments, error: investmentsError } = await supabase
-        .from('user_investments')
-        .select('offering_id')
-        .eq('user_id', user.id);
+      const investments = await api.get<{ offeringId: string }[]>('/investments');
+      const offeringIds = [...new Set(investments.map((inv) => inv.offeringId))];
 
-      if (investmentsError) throw investmentsError;
+      const perOffering = await Promise.all(
+        offeringIds.map(async (offeringId) => {
+          const [offering, docs] = await Promise.all([
+            api.get<{ title: string }>(`/offerings/${offeringId}`),
+            // Same visibility as the original: gated to fully-verified
+            // investors on active offerings — can legitimately 403 for an
+            // investor whose offering has since closed, or who isn't fully
+            // verified. Treated as "no documents", not an error.
+            api
+              .get<Record<string, unknown>[]>(`/offerings/${offeringId}/documents`)
+              .catch(() => []),
+          ]);
+          return docs.map((doc) => ({
+            id: doc.id as string,
+            title: doc.title as string,
+            description: doc.description as string | undefined,
+            file_path: doc.filePath as string,
+            file_size: doc.fileSize as number | undefined,
+            mime_type: doc.mimeType as string | undefined,
+            created_at: doc.createdAt as string,
+            category: doc.documentCategory as string,
+            offering_id: offeringId,
+            offering_title: offering.title,
+          }));
+        }),
+      );
 
-      if (investments && investments.length > 0) {
-        const offeringIds = investments.map(inv => inv.offering_id);
-        
-        // Get documents for user's investments
-        const { data: docs, error: docsError } = await supabase
-          .from('offering_documents')
-          .select(`
-            id,
-            title,
-            description,
-            file_path,
-            file_name,
-            file_size,
-            mime_type,
-            document_category,
-            created_at,
-            offering_id,
-            investment_offerings!inner(title)
-          `)
-          .in('offering_id', offeringIds)
-          .order('created_at', { ascending: false });
-
-        if (docsError) throw docsError;
-
-        const formattedDocs = docs?.map(doc => ({
-          id: doc.id,
-          title: doc.title,
-          description: doc.description,
-          file_path: doc.file_path,
-          file_size: doc.file_size,
-          mime_type: doc.mime_type,
-          created_at: doc.created_at,
-          category: doc.document_category,
-          offering_id: doc.offering_id,
-          offering_title: (doc.investment_offerings as any)?.title
-        })) || [];
-
-        setInvestmentDocuments(formattedDocs);
-      }
+      setInvestmentDocuments(perOffering.flat());
     } catch (err) {
       console.error('Error fetching investment documents:', err);
       setError('Failed to load investment documents');
@@ -100,14 +97,23 @@ export const useDocuments = () => {
     if (!user?.id) return;
 
     try {
-      const { data, error } = await supabase
-        .from('verification_documents')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setVerificationDocuments(data || []);
+      const docs = await api.get<Record<string, unknown>[]>('/verification-documents');
+      setVerificationDocuments(
+        docs.map((d) => ({
+          id: d.id as string,
+          title: d.title as string,
+          document_type: d.documentType as string,
+          file_path: d.filePath as string,
+          file_name: d.fileName as string,
+          file_size: d.fileSize as number | undefined,
+          mime_type: d.mimeType as string | undefined,
+          verification_status: d.verificationStatus as string,
+          reviewer_notes: d.reviewerNotes as string | undefined,
+          created_at: d.createdAt as string,
+          expiry_date: d.expiryDate as string | undefined,
+          is_expired: Boolean(d.isExpired),
+        })),
+      );
     } catch (err) {
       console.error('Error fetching verification documents:', err);
       setError('Failed to load verification documents');
@@ -118,49 +124,61 @@ export const useDocuments = () => {
     if (!user?.id) return;
 
     try {
-      const { data, error } = await supabase
-        .from('documents')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      const formattedDocs = data?.map(doc => ({
-        id: doc.id,
-        title: doc.title,
-        description: doc.description,
-        file_path: doc.file_path,
-        file_size: doc.file_size,
-        mime_type: doc.mime_type,
-        created_at: doc.created_at,
-        category: doc.document_type || 'general'
-      })) || [];
-
-      setGeneralDocuments(formattedDocs);
+      const docs = await api.get<Record<string, unknown>[]>('/documents');
+      setGeneralDocuments(
+        docs.map((doc) => ({
+          id: doc.id as string,
+          title: doc.title as string,
+          description: doc.description as string | undefined,
+          file_path: doc.filePath as string,
+          file_size: doc.fileSize as number | undefined,
+          mime_type: doc.mimeType as string | undefined,
+          created_at: doc.createdAt as string,
+          category: (doc.documentType as string) || 'general',
+        })),
+      );
     } catch (err) {
       console.error('Error fetching general documents:', err);
       setError('Failed to load account documents');
     }
   };
 
+  // For callers with a RAW storage path — every current caller (DocumentCard,
+  // VerificationDocumentCard, DocumentReviewModal) works this way, signing
+  // on demand at preview/download time rather than eagerly for a whole list.
+  // See backend/src/routes/storage.ts for the authorization this enforces
+  // (mirrors the original app's storage-level RLS policies specifically,
+  // which are simpler than — and distinct from — the table-row policies).
+  const getSignedUrl = async (filePath: string, bucketName: BucketName = 'offering-documents') => {
+    try {
+      const { url } = await api.post<{ url: string }>('/storage/signed-url', {
+        bucket: BUCKET_MAP[bucketName],
+        filePath,
+      });
+      return url;
+    } catch (err) {
+      console.error('Error getting signed URL:', err);
+      return null;
+    }
+  };
+
   const downloadDocument = async (filePath: string, fileName: string) => {
     try {
-      const { data, error } = await supabase.storage
-        .from('offering-documents')
-        .download(filePath);
+      const url = await getSignedUrl(filePath, 'offering-documents');
+      if (!url) throw new Error('Could not sign download URL');
 
-      if (error) throw error;
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Download failed');
+      const blob = await response.blob();
 
-      // Create download link
-      const url = URL.createObjectURL(data);
+      const objectUrl = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url;
+      a.href = objectUrl;
       a.download = fileName;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      URL.revokeObjectURL(objectUrl);
 
       toast.success('Document downloaded successfully');
     } catch (err) {
@@ -169,32 +187,18 @@ export const useDocuments = () => {
     }
   };
 
-  const getSignedUrl = async (filePath: string, bucketName: string = 'offering-documents') => {
-    try {
-      const { data, error } = await supabase.storage
-        .from(bucketName)
-        .createSignedUrl(filePath, 3600); // 1 hour expiry
-
-      if (error) throw error;
-      return data.signedUrl;
-    } catch (err) {
-      console.error('Error getting signed URL:', err);
-      return null;
-    }
-  };
-
   useEffect(() => {
     if (user?.id) {
       const fetchAllDocuments = async () => {
         setLoading(true);
         setError(null);
-        
+
         await Promise.all([
           fetchInvestmentDocuments(),
           fetchVerificationDocuments(),
           fetchGeneralDocuments()
         ]);
-        
+
         setLoading(false);
       };
 

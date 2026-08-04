@@ -12,13 +12,17 @@ import { Separator } from '@/components/ui/separator';
 import { Progress } from '@/components/ui/progress';
 import { ArrowLeft, Save, Send } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
+import { api, uploadFile as putFileToSignedUrl } from '@/lib/api-client';
 import { useAuth } from '@/contexts/AuthContext';
 import { FileUploadField } from './FileUploadField';
 import { MediaPreview } from './MediaPreview';
 import { MilestoneManager, type Milestone } from './MilestoneManager';
 import { InvestmentOfferingWithDetails, OfferingMedia } from '@/types/investment';
 import { toast } from 'sonner';
+
+// Backend numeric columns accept strings; form fields are optional numbers.
+const numOrUndef = (n: number | undefined): string | undefined =>
+  n === undefined ? undefined : String(n);
 
 const createOfferingSchema = z.object({
   // Deal Overview
@@ -220,14 +224,23 @@ export const CreateOfferingForm: React.FC<CreateOfferingFormProps> = ({
     return Math.round(fieldProgress + (mediaProgress * 0.2) + milestoneProgress);
   };
 
-  const uploadFile = async (file: File, bucket: string, path: string): Promise<string | null> => {
+  // Two-step upload: ask the backend for a signed URL scoped to this
+  // offering (it decides the storage path — see
+  // POST /offerings/:id/media/upload-url and /documents/upload-url in
+  // backend/src/routes/offerings.ts and documents.ts), PUT the file
+  // directly to Cloud Storage, return the path for the DB row.
+  const uploadFile = async (
+    file: File,
+    offeringId: string,
+    kind: 'media' | 'document',
+  ): Promise<string | null> => {
     try {
-      const { data, error } = await supabase.storage
-        .from(bucket)
-        .upload(path, file, { upsert: true });
-
-      if (error) throw error;
-      return data.path;
+      const { url, filePath } = await api.post<{ url: string; filePath: string }>(
+        `/offerings/${offeringId}/${kind === 'media' ? 'media' : 'documents'}/upload-url`,
+        { fileName: file.name, contentType: file.type },
+      );
+      await putFileToSignedUrl(url, file);
+      return filePath;
     } catch (error) {
       console.error('Upload error:', error);
       return null;
@@ -255,76 +268,63 @@ export const CreateOfferingForm: React.FC<CreateOfferingFormProps> = ({
   };
 
   const createOffering = async (data: CreateOfferingFormData, isDraft = false) => {
-    // Create the offering record with proper field mapping
+    // Create the offering record with proper field mapping (backend
+    // expects camelCase, numeric columns as strings)
       const offeringData = {
-        // Required fields
         title: data.title,
-        investment_type: data.investment_type,
-        target_amount: data.target_amount,
-        minimum_investment: data.minimum_investment || data.target_amount * 0.01, // Default to 1% of target
-        
-        // Deal Overview fields
-        lister_name: data.lister_name,
-        product_name: data.product_name,
+        investmentType: data.investment_type,
+        targetAmount: String(data.target_amount),
+        minimumInvestment: String(data.minimum_investment || data.target_amount * 0.01),
+
+        listerName: data.lister_name,
+        productName: data.product_name,
         address: data.address,
-        targeted_irr: data.targeted_irr,
-        targeted_avg_coc: data.targeted_avg_coc,
-        distribution_overview: data.distribution_overview,
-        
-        // Optional fields
+        targetedIrr: data.targeted_irr !== undefined ? String(data.targeted_irr) : undefined,
+        targetedAvgCoc: data.targeted_avg_coc !== undefined ? String(data.targeted_avg_coc) : undefined,
+        distributionOverview: data.distribution_overview,
+
         description: data.description,
         location: data.location,
-        maximum_investment: data.maximum_investment,
-        expected_return: data.expected_return,
-        closing_date: data.closing_date ? new Date(data.closing_date).toISOString() : null,
-        
-        // Financial projections
-        tax_fee_adjusted_irr: data.tax_fee_adjusted_irr,
-        tax_fee_adjusted_coc: data.tax_fee_adjusted_coc,
-        tax_adjusted_em: data.tax_adjusted_em,
-        tax_adjusted_cg: data.tax_adjusted_cg,
-        coc_year_1: data.coc_year_1,
-        coc_year_2: data.coc_year_2,
-        coc_year_3: data.coc_year_3,
-        coc_year_4: data.coc_year_4,
-        coc_year_5: data.coc_year_5,
-        coc_year_6: data.coc_year_6,
-        coc_year_7: data.coc_year_7,
-        base_fee: data.base_fee,
-        structure_fee: data.structure_fee,
-        marketing_sales_fee: data.marketing_sales_fee,
-        success_fee: data.success_fee,
-        capital_gain_success_fee: data.capital_gain_success_fee,
-        
-        // Platform settings
-        disregard_user_levels: data.disregard_user_levels,
-        published_wealth_migrate: data.published_wealth_migrate,
-        published_private_wealth: data.published_private_wealth,
-        other_published: data.other_published,
-        enable_source_wealth_screen: data.enable_source_wealth_screen,
-        
-        // System fields
+        maximumInvestment: data.maximum_investment !== undefined ? String(data.maximum_investment) : undefined,
+        expectedReturn: data.expected_return,
+        closingDate: data.closing_date || undefined,
+
+        taxFeeAdjustedIrr: numOrUndef(data.tax_fee_adjusted_irr),
+        taxFeeAdjustedCoc: numOrUndef(data.tax_fee_adjusted_coc),
+        taxAdjustedEm: numOrUndef(data.tax_adjusted_em),
+        taxAdjustedCg: numOrUndef(data.tax_adjusted_cg),
+        cocYear1: numOrUndef(data.coc_year_1),
+        cocYear2: numOrUndef(data.coc_year_2),
+        cocYear3: numOrUndef(data.coc_year_3),
+        cocYear4: numOrUndef(data.coc_year_4),
+        cocYear5: numOrUndef(data.coc_year_5),
+        cocYear6: numOrUndef(data.coc_year_6),
+        cocYear7: numOrUndef(data.coc_year_7),
+        baseFee: numOrUndef(data.base_fee),
+        structureFee: numOrUndef(data.structure_fee),
+        marketingSalesFee: numOrUndef(data.marketing_sales_fee),
+        successFee: numOrUndef(data.success_fee),
+        capitalGainSuccessFee: numOrUndef(data.capital_gain_success_fee),
+
+        disregardUserLevels: data.disregard_user_levels,
+        publishedWealthMigrate: data.published_wealth_migrate,
+        publishedPrivateWealth: data.published_private_wealth,
+        otherPublished: data.other_published,
+        enableSourceWealthScreen: data.enable_source_wealth_screen,
+
         status: (isDraft ? 'draft' : 'active') as 'draft' | 'active',
-        created_by: user.id,
-        raised_amount: 0,
       };
 
-      const { data: offering, error: offeringError } = await supabase
-        .from('investment_offerings')
-        .insert(offeringData)
-        .select()
-        .single();
-
-      if (offeringError) throw offeringError;
+      const offering = await api.post<{ id: string }>('/offerings', offeringData);
 
       // Upload media files
       const mediaUploads: Array<{ type: string; file: File; order?: number }> = [];
-      
+
       if (listerLogo?.[0]) mediaUploads.push({ type: 'lister_logo', file: listerLogo[0] });
       if (sponsorLogo?.[0]) mediaUploads.push({ type: 'sponsor_logo', file: sponsorLogo[0] });
       if (ddProviderLogo?.[0]) mediaUploads.push({ type: 'dd_provider_logo', file: ddProviderLogo[0] });
       if (featuredImage?.[0]) mediaUploads.push({ type: 'featured_image', file: featuredImage[0] });
-      
+
       if (galleryImages) {
         galleryImages.forEach((file, index) => {
           mediaUploads.push({ type: 'gallery_image', file, order: index });
@@ -332,18 +332,16 @@ export const CreateOfferingForm: React.FC<CreateOfferingFormProps> = ({
       }
 
       for (const upload of mediaUploads) {
-        const fileName = `${offering.id}/${upload.type}_${Date.now()}_${upload.file.name}`;
-        const filePath = await uploadFile(upload.file, 'offering-media', fileName);
-        
+        const filePath = await uploadFile(upload.file, offering.id, 'media');
+
         if (filePath) {
-          await supabase.from('offering_media').insert({
-            offering_id: offering.id,
-            media_type: upload.type,
-            file_path: filePath,
-            file_name: upload.file.name,
-            file_size: upload.file.size,
-            mime_type: upload.file.type,
-            display_order: upload.order || 0
+          await api.post(`/offerings/${offering.id}/media`, {
+            mediaType: upload.type,
+            filePath,
+            fileName: upload.file.name,
+            fileSize: upload.file.size,
+            mimeType: upload.file.type,
+            displayOrder: upload.order || 0,
           });
         }
       }
@@ -360,20 +358,17 @@ export const CreateOfferingForm: React.FC<CreateOfferingFormProps> = ({
       for (const docUpload of documentUploads) {
         if (docUpload.files) {
           for (const file of docUpload.files) {
-            const fileName = `${offering.id}/${docUpload.category}_${Date.now()}_${file.name}`;
-            const filePath = await uploadFile(file, 'offering-documents', fileName);
-            
+            const filePath = await uploadFile(file, offering.id, 'document');
+
             if (filePath) {
-              await supabase.from('offering_documents').insert({
-                offering_id: offering.id,
-                document_category: docUpload.category,
+              await api.post(`/offerings/${offering.id}/documents`, {
+                documentCategory: docUpload.category,
                 title: file.name,
-                file_path: filePath,
-                file_name: file.name,
-                file_size: file.size,
-                mime_type: file.type,
-                is_required: docUpload.required,
-                uploaded_by: user.id
+                filePath,
+                fileName: file.name,
+                fileSize: file.size,
+                mimeType: file.type,
+                isRequired: docUpload.required,
               });
             }
           }
@@ -382,24 +377,22 @@ export const CreateOfferingForm: React.FC<CreateOfferingFormProps> = ({
 
       // Save milestones
       if (milestones.length > 0) {
-        const milestoneData = milestones.map((milestone, index) => ({
-          offering_id: offering.id,
-          description: milestone.description,
-          milestone_date: milestone.date?.toISOString().split('T')[0],
-          milestone_order: index + 1
-        }));
-
-        await supabase.from('offering_milestones').insert(milestoneData);
+        for (const [index, milestone] of milestones.entries()) {
+          await api.post(`/offerings/${offering.id}/milestones`, {
+            description: milestone.description,
+            milestoneDate: milestone.date?.toISOString().split('T')[0],
+            milestoneOrder: index + 1,
+          });
+        }
       }
 
       // Handle video links
       if (videoLinks.trim()) {
         const videoUrls = videoLinks.split('\n').filter(url => url.trim());
         for (const url of videoUrls) {
-          await supabase.from('offering_media').insert({
-            offering_id: offering.id,
-            media_type: 'video_link',
-            url: url.trim()
+          await api.post(`/offerings/${offering.id}/media`, {
+            mediaType: 'video_link',
+            url: url.trim(),
           });
         }
       }
@@ -412,82 +405,68 @@ export const CreateOfferingForm: React.FC<CreateOfferingFormProps> = ({
   const updateOffering = async (data: CreateOfferingFormData, isDraft = false) => {
     if (!offering) return;
 
-    // Update the offering record
     const offeringData = {
-      // Required fields
       title: data.title,
-      investment_type: data.investment_type,
-      target_amount: data.target_amount,
-      minimum_investment: data.minimum_investment || data.target_amount * 0.01,
-      
-      // Deal Overview fields
-      lister_name: data.lister_name,
-      product_name: data.product_name,
+      investmentType: data.investment_type,
+      targetAmount: String(data.target_amount),
+      minimumInvestment: String(data.minimum_investment || data.target_amount * 0.01),
+
+      listerName: data.lister_name,
+      productName: data.product_name,
       address: data.address,
-      targeted_irr: data.targeted_irr,
-      targeted_avg_coc: data.targeted_avg_coc,
-      distribution_overview: data.distribution_overview,
-      
-      // Optional fields
+      targetedIrr: data.targeted_irr !== undefined ? String(data.targeted_irr) : undefined,
+      targetedAvgCoc: data.targeted_avg_coc !== undefined ? String(data.targeted_avg_coc) : undefined,
+      distributionOverview: data.distribution_overview,
+
       description: data.description,
       location: data.location,
-      maximum_investment: data.maximum_investment,
-      expected_return: data.expected_return,
-      closing_date: data.closing_date ? new Date(data.closing_date).toISOString() : null,
-      
-      // Financial projections
-      tax_fee_adjusted_irr: data.tax_fee_adjusted_irr,
-      tax_fee_adjusted_coc: data.tax_fee_adjusted_coc,
-      tax_adjusted_em: data.tax_adjusted_em,
-      tax_adjusted_cg: data.tax_adjusted_cg,
-      coc_year_1: data.coc_year_1,
-      coc_year_2: data.coc_year_2,
-      coc_year_3: data.coc_year_3,
-      coc_year_4: data.coc_year_4,
-      coc_year_5: data.coc_year_5,
-      coc_year_6: data.coc_year_6,
-      coc_year_7: data.coc_year_7,
-      base_fee: data.base_fee,
-      structure_fee: data.structure_fee,
-      marketing_sales_fee: data.marketing_sales_fee,
-      success_fee: data.success_fee,
-      capital_gain_success_fee: data.capital_gain_success_fee,
-      
-      // Platform settings
-      disregard_user_levels: data.disregard_user_levels,
-      published_wealth_migrate: data.published_wealth_migrate,
-      published_private_wealth: data.published_private_wealth,
-      other_published: data.other_published,
-      enable_source_wealth_screen: data.enable_source_wealth_screen,
-      
-      // System fields
+      maximumInvestment: data.maximum_investment !== undefined ? String(data.maximum_investment) : undefined,
+      expectedReturn: data.expected_return,
+      closingDate: data.closing_date || undefined,
+
+      taxFeeAdjustedIrr: numOrUndef(data.tax_fee_adjusted_irr),
+      taxFeeAdjustedCoc: numOrUndef(data.tax_fee_adjusted_coc),
+      taxAdjustedEm: numOrUndef(data.tax_adjusted_em),
+      taxAdjustedCg: numOrUndef(data.tax_adjusted_cg),
+      cocYear1: numOrUndef(data.coc_year_1),
+      cocYear2: numOrUndef(data.coc_year_2),
+      cocYear3: numOrUndef(data.coc_year_3),
+      cocYear4: numOrUndef(data.coc_year_4),
+      cocYear5: numOrUndef(data.coc_year_5),
+      cocYear6: numOrUndef(data.coc_year_6),
+      cocYear7: numOrUndef(data.coc_year_7),
+      baseFee: numOrUndef(data.base_fee),
+      structureFee: numOrUndef(data.structure_fee),
+      marketingSalesFee: numOrUndef(data.marketing_sales_fee),
+      successFee: numOrUndef(data.success_fee),
+      capitalGainSuccessFee: numOrUndef(data.capital_gain_success_fee),
+
+      disregardUserLevels: data.disregard_user_levels,
+      publishedWealthMigrate: data.published_wealth_migrate,
+      publishedPrivateWealth: data.published_private_wealth,
+      otherPublished: data.other_published,
+      enableSourceWealthScreen: data.enable_source_wealth_screen,
+
       status: (isDraft ? 'draft' : offering.status || 'active') as 'draft' | 'active' | 'closed' | 'cancelled',
-      updated_at: new Date().toISOString(),
     };
 
-    const { error: offeringError } = await supabase
-      .from('investment_offerings')
-      .update(offeringData)
-      .eq('id', offering.id);
-
-    if (offeringError) throw offeringError;
+    await api.patch(`/offerings/${offering.id}`, offeringData);
 
     // Delete media marked for deletion
-    if (mediaToDelete.length > 0) {
-      await supabase
-        .from('offering_media')
-        .delete()
-        .in('id', mediaToDelete);
+    for (const mediaId of mediaToDelete) {
+      await api.delete(`/offerings/${offering.id}/media/${mediaId}`);
     }
 
-    // Handle new media uploads (keep existing ones, add new ones)
+    // Handle new media uploads (keep existing ones, add new ones —
+    // replaceExisting swaps out any prior media of the same type in one
+    // atomic call, matching the original delete-then-insert behavior)
     const mediaUploads: Array<{ type: string; file: File; order?: number }> = [];
-    
+
     if (listerLogo?.[0]) mediaUploads.push({ type: 'lister_logo', file: listerLogo[0] });
     if (sponsorLogo?.[0]) mediaUploads.push({ type: 'sponsor_logo', file: sponsorLogo[0] });
     if (ddProviderLogo?.[0]) mediaUploads.push({ type: 'dd_provider_logo', file: ddProviderLogo[0] });
     if (featuredImage?.[0]) mediaUploads.push({ type: 'featured_image', file: featuredImage[0] });
-    
+
     if (galleryImages) {
       galleryImages.forEach((file, index) => {
         mediaUploads.push({ type: 'gallery_image', file, order: index });
@@ -495,26 +474,17 @@ export const CreateOfferingForm: React.FC<CreateOfferingFormProps> = ({
     }
 
     for (const upload of mediaUploads) {
-      const fileName = `${offering.id}/${upload.type}_${Date.now()}_${upload.file.name}`;
-      const filePath = await uploadFile(upload.file, 'offering-media', fileName);
-      
-      if (filePath) {
-        // Remove existing media of the same type if uploading new ones
-        await supabase
-          .from('offering_media')
-          .delete()
-          .eq('offering_id', offering.id)
-          .eq('media_type', upload.type);
+      const filePath = await uploadFile(upload.file, offering.id, 'media');
 
-        // Add new media
-        await supabase.from('offering_media').insert({
-          offering_id: offering.id,
-          media_type: upload.type,
-          file_path: filePath,
-          file_name: upload.file.name,
-          file_size: upload.file.size,
-          mime_type: upload.file.type,
-          display_order: upload.order || 0
+      if (filePath) {
+        await api.post(`/offerings/${offering.id}/media`, {
+          mediaType: upload.type,
+          filePath,
+          fileName: upload.file.name,
+          fileSize: upload.file.size,
+          mimeType: upload.file.type,
+          displayOrder: upload.order || 0,
+          replaceExisting: true,
         });
       }
     }
@@ -531,59 +501,47 @@ export const CreateOfferingForm: React.FC<CreateOfferingFormProps> = ({
     for (const docUpload of documentUploads) {
       if (docUpload.files) {
         for (const file of docUpload.files) {
-          const fileName = `${offering.id}/${docUpload.category}_${Date.now()}_${file.name}`;
-          const filePath = await uploadFile(file, 'offering-documents', fileName);
-          
+          const filePath = await uploadFile(file, offering.id, 'document');
+
           if (filePath) {
-            await supabase.from('offering_documents').insert({
-              offering_id: offering.id,
-              document_category: docUpload.category,
+            await api.post(`/offerings/${offering.id}/documents`, {
+              documentCategory: docUpload.category,
               title: file.name,
-              file_path: filePath,
-              file_name: file.name,
-              file_size: file.size,
-              mime_type: file.type,
-              is_required: docUpload.required,
-              uploaded_by: user.id
+              filePath,
+              fileName: file.name,
+              fileSize: file.size,
+              mimeType: file.type,
+              isRequired: docUpload.required,
             });
           }
         }
       }
     }
 
-    // Update milestones (remove existing, add new)
-    await supabase
-      .from('offering_milestones')
-      .delete()
-      .eq('offering_id', offering.id);
-
-    if (milestones.length > 0) {
-      const milestoneData = milestones.map((milestone, index) => ({
-        offering_id: offering.id,
+    // Update milestones (bulk replace: existing set → current set, in one call)
+    await api.put(
+      `/offerings/${offering.id}/milestones`,
+      milestones.map((milestone, index) => ({
         description: milestone.description,
-        milestone_date: milestone.date?.toISOString().split('T')[0],
-        milestone_order: index + 1
-      }));
-
-      await supabase.from('offering_milestones').insert(milestoneData);
-    }
+        milestoneDate: milestone.date?.toISOString().split('T')[0],
+        milestoneOrder: index + 1,
+      })),
+    );
 
     // Handle video links
     if (videoLinks.trim()) {
-      // Remove existing video links
-      await supabase
-        .from('offering_media')
-        .delete()
-        .eq('offering_id', offering.id)
-        .eq('media_type', 'video_link');
+      // Remove existing video links (existingMedia already holds this
+      // offering's media as fetched for the edit form, filtered here rather
+      // than via a bulk-delete-by-type endpoint the backend doesn't have)
+      for (const media of existingMedia.filter((m) => m.media_type === 'video_link')) {
+        await api.delete(`/offerings/${offering.id}/media/${media.id}`);
+      }
 
-      // Add new video links
       const videoUrls = videoLinks.split('\n').filter(url => url.trim());
       for (const url of videoUrls) {
-        await supabase.from('offering_media').insert({
-          offering_id: offering.id,
-          media_type: 'video_link',
-          url: url.trim()
+        await api.post(`/offerings/${offering.id}/media`, {
+          mediaType: 'video_link',
+          url: url.trim(),
         });
       }
     }

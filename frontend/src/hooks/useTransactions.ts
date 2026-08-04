@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api-client';
 
 interface Transaction {
   id: string;
@@ -19,6 +19,20 @@ interface AccountSummary {
   totalInvestments: number;
   pendingDistributions: number;
   recentCapitalCalls: number;
+}
+
+function mapTransaction(t: Record<string, unknown>): Transaction {
+  return {
+    id: t.id as string,
+    user_id: t.userId as string,
+    investment_id: t.investmentId as string | undefined,
+    type: t.type as Transaction['type'],
+    amount: Number(t.amount),
+    transaction_date: t.transactionDate as string,
+    created_at: t.createdAt as string,
+    description: t.description as string | undefined,
+    reference_number: t.referenceNumber as string | undefined,
+  };
 }
 
 export const useTransactions = () => {
@@ -45,14 +59,13 @@ export const useTransactions = () => {
       setLoading(true);
       setError(null);
 
-      const { data, error } = await supabase
-        .from('transactions')
-        .select('*')
-        .eq('user_id', user?.id)
-        .order('transaction_date', { ascending: false });
-
-      if (error) throw error;
-      setTransactions(data || []);
+      // GET /transactions already scopes to "own rows, or admin sees all"
+      // server-side (see backend/authz/policies.ts canViewTransaction).
+      const raw = await api.get<Record<string, unknown>[]>('/transactions');
+      const mapped = raw
+        .map(mapTransaction)
+        .sort((a, b) => b.transaction_date.localeCompare(a.transaction_date));
+      setTransactions(mapped);
     } catch (err) {
       console.error('Error fetching transactions:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch transactions');
@@ -63,30 +76,26 @@ export const useTransactions = () => {
 
   const fetchAccountSummary = async () => {
     try {
-      // Fetch user investments
-      const { data: investments } = await supabase
-        .from('user_investments')
-        .select('investment_amount')
-        .eq('user_id', user?.id);
+      const [investments, txRaw] = await Promise.all([
+        api.get<{ investmentAmount: string }[]>('/investments'),
+        api.get<{ type: string; amount: string }[]>('/transactions'),
+      ]);
 
-      // Fetch transactions for calculations
-      const { data: transactionData } = await supabase
-        .from('transactions')
-        .select('type, amount')
-        .eq('user_id', user?.id);
+      const totalInvestments = investments.reduce((sum, inv) => sum + Number(inv.investmentAmount), 0);
 
-      const totalInvestments = investments?.reduce((sum, inv) => sum + Number(inv.investment_amount), 0) || 0;
-      
-      const contributions = transactionData?.filter(t => t.type === 'contribution')
-        .reduce((sum, t) => sum + Number(t.amount), 0) || 0;
-      
-      const distributions = transactionData?.filter(t => t.type === 'distribution')
-        .reduce((sum, t) => sum + Number(t.amount), 0) || 0;
-      
+      const contributions = txRaw
+        .filter((t) => t.type === 'contribution')
+        .reduce((sum, t) => sum + Number(t.amount), 0);
+
+      const distributions = txRaw
+        .filter((t) => t.type === 'distribution')
+        .reduce((sum, t) => sum + Number(t.amount), 0);
+
       const pendingDistributions = 0; // Will be implemented with new schema
-      
-      const capitalCalls = transactionData?.filter(t => t.type === 'fee')
-        .reduce((sum, t) => sum + Number(t.amount), 0) || 0;
+
+      const capitalCalls = txRaw
+        .filter((t) => t.type === 'fee')
+        .reduce((sum, t) => sum + Number(t.amount), 0);
 
       setAccountSummary({
         cashAvailable: contributions - totalInvestments + distributions,
@@ -99,24 +108,21 @@ export const useTransactions = () => {
     }
   };
 
+  // Admin-only on the backend (matches the original RLS: there was never a
+  // user-facing INSERT policy for transactions, only "Admins can manage
+  // transactions") — not currently called from anywhere in the app, same
+  // as it was originally.
   const createTransaction = async (transactionData: Omit<Transaction, 'id' | 'user_id' | 'created_at'>) => {
     try {
-      const { data, error } = await supabase
-        .from('transactions')
-        .insert({
-          amount: transactionData.amount,
-          type: transactionData.type as 'contribution' | 'distribution' | 'fee' | 'expense',
-          description: transactionData.description,
-          reference_number: transactionData.reference_number,
-          user_id: user?.id,
-          investment_id: transactionData.investment_id
-        })
-        .select()
-        .single();
+      const data = await api.post('/transactions', {
+        userId: user?.id,
+        investmentId: transactionData.investment_id,
+        type: transactionData.type,
+        amount: String(transactionData.amount),
+        description: transactionData.description,
+        referenceNumber: transactionData.reference_number,
+      });
 
-      if (error) throw error;
-
-      // Refresh data
       await fetchTransactions();
       await fetchAccountSummary();
 
@@ -133,11 +139,11 @@ export const useTransactions = () => {
     dateRange?: { start: string; end: string };
   }) => {
     return transactions.filter(transaction => {
-      const matchesSearch = !filters.search || 
+      const matchesSearch = !filters.search ||
         transaction.description?.toLowerCase().includes(filters.search.toLowerCase()) ||
         transaction.reference_number?.toLowerCase().includes(filters.search.toLowerCase());
 
-      const matchesType = !filters.type || filters.type === 'all' || 
+      const matchesType = !filters.type || filters.type === 'all' ||
         transaction.type === filters.type;
 
       const matchesDate = !filters.dateRange || (

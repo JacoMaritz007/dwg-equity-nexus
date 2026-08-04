@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api-client';
 
 interface VerificationStatus {
   identity_verified: boolean;
@@ -14,6 +14,22 @@ interface VerificationStatus {
   verification_level: string | null;
   overall_progress: number;
   can_invest: boolean;
+}
+
+interface ProfileResponse {
+  isAccredited: boolean | null;
+  investorClassification: string | null;
+  verificationLevel: string | null;
+}
+
+interface VerificationDocResponse {
+  documentType: string;
+  verificationStatus: string;
+}
+
+interface ScreeningDocResponse {
+  screeningType: string;
+  status: string;
 }
 
 export const useVerificationStatus = () => {
@@ -33,80 +49,53 @@ export const useVerificationStatus = () => {
       setLoading(true);
       setError(null);
 
-      // Fetch user profile data
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select(`
-          kyc_verified,
-          is_accredited,
-          investor_classification,
-          verification_level,
-          identity_verified,
-          address_verified,
-          financial_verified,
-          pep_screened,
-          sanctions_screened
-        `)
-        .eq('id', user.id)
-        .single();
+      const [profile, documents, screeningDocs] = await Promise.all([
+        api.get<ProfileResponse>(`/profiles/${user.id}`),
+        api.get<VerificationDocResponse[]>('/verification-documents'),
+        api.get<ScreeningDocResponse[]>('/compliance-screening'),
+      ]);
 
-      if (profileError) throw profileError;
-
-      // Fetch approved verification documents count
-      const { data: documents, error: docsError } = await supabase
-        .from('verification_documents')
-        .select('document_type')
-        .eq('user_id', user.id)
-        .eq('verification_status', 'approved');
-
-      if (docsError) throw docsError;
-
-      // Check which document types are approved
-      const approvedDocTypes = new Set(documents?.map(doc => doc.document_type) || []);
-      const hasIdentityDoc = approvedDocTypes.has('passport') || 
-                            approvedDocTypes.has('national_id') || 
-                            approvedDocTypes.has('driving_license');
+      // Both list endpoints already scope to "own rows, or admin sees all"
+      // server-side (see backend/authz/policies.ts) — filtering to
+      // 'approved' here mirrors the original app's client-side filter.
+      const approvedDocTypes = new Set(
+        documents.filter((d) => d.verificationStatus === 'approved').map((d) => d.documentType),
+      );
+      const hasIdentityDoc =
+        approvedDocTypes.has('passport') ||
+        approvedDocTypes.has('national_id') ||
+        approvedDocTypes.has('driving_license');
       const hasAddressDoc = approvedDocTypes.has('proof_of_address');
-      const hasFinancialDoc = approvedDocTypes.has('bank_statement') || 
-                             approvedDocTypes.has('income_verification') || 
-                             approvedDocTypes.has('source_of_wealth');
+      const hasFinancialDoc =
+        approvedDocTypes.has('bank_statement') ||
+        approvedDocTypes.has('income_verification') ||
+        approvedDocTypes.has('source_of_wealth');
 
-      // Fetch compliance screening documents
-      const { data: screeningDocs, error: screeningError } = await supabase
-        .from('compliance_screening_documents')
-        .select('screening_type')
-        .eq('user_id', user.id)
-        .eq('status', 'approved');
-
-      if (screeningError) throw screeningError;
-
-      const approvedScreenings = new Set(screeningDocs?.map(doc => doc.screening_type) || []);
+      const approvedScreenings = new Set(
+        screeningDocs.filter((d) => d.status === 'approved').map((d) => d.screeningType),
+      );
       const pepScreened = approvedScreenings.has('pep');
       const sanctionsScreened = approvedScreenings.has('sanctions');
 
-      // Calculate verification status
       const identity_verified = hasIdentityDoc;
       const address_verified = hasAddressDoc;
       const financial_verified = hasFinancialDoc;
       const kyc_completed = identity_verified && address_verified && financial_verified;
-      const is_accredited = profile?.is_accredited || false;
+      const is_accredited = profile?.isAccredited || false;
 
-      // Calculate overall progress (5 steps total)
       const verificationSteps = [
         identity_verified,
         address_verified,
         financial_verified,
         pepScreened,
-        sanctionsScreened
+        sanctionsScreened,
       ];
-      
+
       const completedSteps = verificationSteps.filter(Boolean).length;
       const overall_progress = Math.round((completedSteps / verificationSteps.length) * 100);
-
-      // User can invest if all verifications are complete
       const can_invest = verificationSteps.every(Boolean);
 
-      const verificationStatus: VerificationStatus = {
+      setStatus({
         identity_verified,
         address_verified,
         financial_verified,
@@ -114,13 +103,11 @@ export const useVerificationStatus = () => {
         sanctions_screened: sanctionsScreened,
         kyc_completed,
         is_accredited,
-        investor_classification: profile?.investor_classification,
-        verification_level: profile?.verification_level,
+        investor_classification: profile?.investorClassification ?? null,
+        verification_level: profile?.verificationLevel ?? null,
         overall_progress,
-        can_invest
-      };
-
-      setStatus(verificationStatus);
+        can_invest,
+      });
     } catch (err) {
       console.error('Error fetching verification status:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch verification status');

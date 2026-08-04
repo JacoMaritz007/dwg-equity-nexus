@@ -131,7 +131,10 @@ export const useInvestmentOfferings = () => {
       setError(null);
 
       const raw = await api.get<Record<string, unknown>[]>('/offerings');
-      let data: InvestmentOfferingWithDetails[] = raw.map(mapOffering);
+      let data: InvestmentOfferingWithDetails[] = raw.map((o) => ({
+        ...mapOffering(o),
+        offering_media: ((o.offeringMedia as Record<string, unknown>[]) ?? []).map(mapMedia),
+      }));
 
       if (filters?.status) {
         if (filters.status === 'past') {
