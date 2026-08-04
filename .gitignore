@@ -12,6 +12,11 @@ dist
 dist-ssr
 *.local
 
+# Backend build artifacts / local env (never commit secrets)
+backend/dist
+.env
+!.env.example
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
