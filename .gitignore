@@ -16,6 +16,7 @@ dist-ssr
 backend/dist
 .env
 !.env.example
+*.tsbuildinfo
 
 # Editor directories and files
 .vscode/*

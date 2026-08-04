@@ -1,20 +1,23 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api-client';
 
+// Field names are camelCase now (matches the API's JSON responses directly,
+// which come straight from Drizzle) — the old snake_case shape was just
+// Postgres's column naming leaking through the Supabase client.
 interface UserProfile {
   id: string;
-  kyc_verified: boolean;
-  identity_verified: boolean;
-  address_verified: boolean;
-  financial_verified: boolean;
-  is_accredited: boolean;
-  first_name?: string;
-  last_name?: string;
-  email?: string;
-  phone?: string;
-  annual_income?: number;
-  net_worth?: number;
+  kycVerified: boolean | null;
+  identityVerified: boolean | null;
+  addressVerified: boolean | null;
+  financialVerified: boolean | null;
+  isAccredited: boolean | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  annualIncome?: string | null;
+  netWorth?: string | null;
 }
 
 export const useUserProfile = () => {
@@ -23,27 +26,12 @@ export const useUserProfile = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (user) {
-      fetchProfile();
-    } else {
-      setProfile(null);
-      setLoading(false);
-    }
-  }, [user]);
-
-  const fetchProfile = async () => {
+  const fetchProfile = useCallback(async () => {
+    if (!user) return;
     try {
       setLoading(true);
       setError(null);
-      
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user?.id)
-        .single();
-
-      if (error) throw error;
+      const data = await api.get<UserProfile>(`/profiles/${user.id}`);
       setProfile(data);
     } catch (err) {
       console.error('Error fetching user profile:', err);
@@ -51,20 +39,22 @@ export const useUserProfile = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    if (user) {
+      fetchProfile();
+    } else {
+      setProfile(null);
+      setLoading(false);
+    }
+  }, [user, fetchProfile]);
 
   const updateProfile = async (updates: Partial<UserProfile>) => {
+    if (!user) throw new Error('Not authenticated');
     try {
       setError(null);
-      
-      const { data, error } = await supabase
-        .from('profiles')
-        .update(updates)
-        .eq('id', user?.id)
-        .select()
-        .single();
-
-      if (error) throw error;
+      const data = await api.patch<UserProfile>(`/profiles/${user.id}`, updates);
       setProfile(data);
       return data;
     } catch (err) {
@@ -74,10 +64,8 @@ export const useUserProfile = () => {
     }
   };
 
-  const isVerified = profile?.kyc_verified && 
-                    profile?.identity_verified;
-
-  const canInvest = isVerified && profile?.is_accredited;
+  const isVerified = Boolean(profile?.kycVerified && profile?.identityVerified);
+  const canInvest = isVerified && Boolean(profile?.isAccredited);
 
   return {
     profile,

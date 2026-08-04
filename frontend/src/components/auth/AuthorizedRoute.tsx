@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 
 interface AuthorizedRouteProps {
   children: React.ReactNode;
-  requiredPermission?: string;
   requiredRole?: string;
   resource?: string;
   action?: string;
@@ -16,13 +15,12 @@ interface AuthorizedRouteProps {
 
 export const AuthorizedRoute: React.FC<AuthorizedRouteProps> = ({
   children,
-  requiredPermission,
   requiredRole,
   resource,
   action = 'read',
   fallbackPath = '/dashboard',
 }) => {
-  const { isAuthenticated, loading, hasPermission, hasRole, canAccess } = useAuth();
+  const { isAuthenticated, loading, hasRole, canAccess } = useAuth();
 
   if (loading) {
     return (
@@ -42,9 +40,7 @@ export const AuthorizedRoute: React.FC<AuthorizedRouteProps> = ({
   // Check authorization
   let hasAccess = true;
 
-  if (requiredPermission) {
-    hasAccess = hasPermission(requiredPermission);
-  } else if (requiredRole) {
+  if (requiredRole) {
     hasAccess = hasRole(requiredRole);
   } else if (resource) {
     hasAccess = canAccess(resource, action);

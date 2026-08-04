@@ -3,7 +3,6 @@ import { useAuth } from '@/contexts/AuthContext';
 
 interface PermissionGateProps {
   children: React.ReactNode;
-  permission?: string;
   role?: string;
   resource?: string;
   action?: string;
@@ -12,19 +11,16 @@ interface PermissionGateProps {
 
 export const PermissionGate: React.FC<PermissionGateProps> = ({
   children,
-  permission,
   role,
   resource,
   action = 'read',
   fallback = null,
 }) => {
-  const { hasPermission, hasRole, canAccess } = useAuth();
+  const { hasRole, canAccess } = useAuth();
 
   let hasAccess = false;
 
-  if (permission) {
-    hasAccess = hasPermission(permission);
-  } else if (role) {
+  if (role) {
     hasAccess = hasRole(role);
   } else if (resource) {
     hasAccess = canAccess(resource, action);

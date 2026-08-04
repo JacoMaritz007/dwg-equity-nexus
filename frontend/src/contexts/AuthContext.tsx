@@ -1,24 +1,45 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
-import { User as SupabaseUser, Session } from '@supabase/supabase-js';
+import React, { createContext, useContext, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut as firebaseSignOut,
+  sendPasswordResetEmail,
+  signInWithPopup,
+  GoogleAuthProvider,
+  GithubAuthProvider,
+  TwitterAuthProvider,
+  type User as FirebaseUser,
+} from "firebase/auth";
+import { auth } from "@/lib/firebase";
+import { api } from "@/lib/api-client";
 
+// Keeps the same flat shape the rest of the app already expects (firstName,
+// lastName, isAccredited directly on `user`) — deliberately NOT restructured
+// into a nested `profile` object, to avoid rippling a breaking type change
+// into every component that reads these fields before they've been
+// migrated off Supabase. `roles` is the one field whose SOURCE changed:
+// it now comes exclusively from the backend's /me endpoint (which reads the
+// user_roles-equivalent table server-side), never from Firebase ID token
+// claims or any client-writable field. This is the fix for the original
+// app's role-spoofing gap — the old AuthContext also trusted
+// `session.user.user_metadata.role`, a field any authenticated user could
+// set on themselves via `supabase.auth.updateUser({ data: { role: 'admin' } })`.
+// There is no equivalent trust path here.
 export interface User {
   id: string;
   email: string;
-  firstName?: string;
-  lastName?: string;
-  isAccredited?: boolean;
-  profilesCount?: number;
-  lastLoginAt?: string;
-  role?: 'investor' | 'admin' | 'viewer';
-  roles?: string[];
-  permissions?: string[];
+  firstName?: string | null;
+  lastName?: string | null;
+  isAccredited?: boolean | null;
+  kycVerified?: boolean | null;
+  roles: string[];
 }
 
 interface AuthContextType {
   user: User | null;
-  session: Session | null;
+  firebaseUser: FirebaseUser | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (userData: RegisterData) => Promise<void>;
@@ -27,8 +48,8 @@ interface AuthContextType {
   signInWithGoogle: () => Promise<void>;
   signInWithGitHub: () => Promise<void>;
   signInWithTwitter: () => Promise<void>;
+  refreshUser: () => Promise<void>;
   isAuthenticated: boolean;
-  hasPermission: (permission: string) => boolean;
   hasRole: (role: string) => boolean;
   canAccess: (resource: string, action?: string) => boolean;
 }
@@ -38,13 +59,18 @@ interface RegisterData {
   lastName: string;
   email: string;
   phone: string;
-  residency: string;
-  investmentIntent: string;
-  isAccredited: boolean;
-  referralSource: string;
   password: string;
-  confirmPassword: string;
-  acceptedTerms: boolean;
+}
+
+interface MeResponse {
+  uid: string;
+  roles: string[];
+  profile: {
+    firstName: string | null;
+    lastName: string | null;
+    isAccredited: boolean | null;
+    kycVerified: boolean | null;
+  } | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -52,253 +78,129 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
+  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [loading, setLoading] = useState(true);
-  const [rolesLoading, setRolesLoading] = useState(false);
   const navigate = useNavigate();
 
-  // Fetch user roles from database
-  const fetchUserRoles = async (userId: string): Promise<string[]> => {
-    try {
-      const { data, error } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', userId);
-      
-      if (error) {
-        console.error('Error fetching user roles:', error);
-        return [];
-      }
-      
-      return data?.map(item => item.role) || [];
-    } catch (error) {
-      console.error('Error fetching user roles:', error);
-      return [];
-    }
+  const loadUser = async (fbUser: FirebaseUser) => {
+    const me = await api.get<MeResponse>("/me");
+    setUser({
+      id: fbUser.uid,
+      email: fbUser.email ?? "",
+      firstName: me.profile?.firstName,
+      lastName: me.profile?.lastName,
+      isAccredited: me.profile?.isAccredited,
+      kycVerified: me.profile?.kycVerified,
+      roles: me.roles,
+    });
   };
 
   useEffect(() => {
-    // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        
-        if (session?.user) {
-          const baseUser = {
-            id: session.user.id,
-            email: session.user.email || '',
-            firstName: session.user.user_metadata?.firstName,
-            lastName: session.user.user_metadata?.lastName,
-            role: session.user.user_metadata?.role || 'investor',
-            permissions: session.user.user_metadata?.permissions || [],
-            roles: []
-          };
-          
-          setUser(baseUser);
-          setLoading(false);
-          
-          // Fetch roles from database using setTimeout to prevent deadlock
-          setTimeout(() => {
-            setRolesLoading(true);
-            fetchUserRoles(session.user.id).then(roles => {
-              setUser(prev => prev ? { ...prev, roles } : null);
-              setRolesLoading(false);
-            });
-          }, 0);
-        } else {
+    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
+      setFirebaseUser(fbUser);
+      if (fbUser) {
+        try {
+          await loadUser(fbUser);
+        } catch (error) {
+          console.error("Failed to load user profile:", error);
           setUser(null);
-          setLoading(false);
         }
-      }
-    );
-
-    // Check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      
-      if (session?.user) {
-        const baseUser = {
-          id: session.user.id,
-          email: session.user.email || '',
-          firstName: session.user.user_metadata?.firstName,
-          lastName: session.user.user_metadata?.lastName,
-          role: session.user.user_metadata?.role || 'investor',
-          permissions: session.user.user_metadata?.permissions || [],
-          roles: []
-        };
-        
-        setUser(baseUser);
-        setLoading(false);
-        
-        // Fetch roles from database
-        setRolesLoading(true);
-        fetchUserRoles(session.user.id).then(roles => {
-          setUser(prev => prev ? { ...prev, roles } : null);
-          setRolesLoading(false);
-        });
       } else {
         setUser(null);
-        setLoading(false);
       }
+      setLoading(false);
     });
-
-    return () => subscription.unsubscribe();
+    return unsubscribe;
   }, []);
 
   const login = async (email: string, password: string) => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      
-      if (error) throw error;
-      navigate('/dashboard');
-    } catch (error) {
-      console.error('Login error:', error);
-      throw error;
+      await signInWithEmailAndPassword(auth, email, password);
+      navigate("/dashboard");
     } finally {
       setLoading(false);
     }
   };
 
   const register = async (userData: RegisterData) => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const redirectUrl = `${window.location.origin}/`;
-      
-      const { error } = await supabase.auth.signUp({
+      const credential = await createUserWithEmailAndPassword(
+        auth,
+        userData.email,
+        userData.password,
+      );
+      // Replaces the old handle_new_user() Postgres trigger: explicitly
+      // create the profile + default 'investor' role via the backend now
+      // that there's no trigger on user creation to do it implicitly.
+      await api.post("/profiles/bootstrap", {
+        firstName: userData.firstName,
+        lastName: userData.lastName,
         email: userData.email,
-        password: userData.password,
-        options: {
-          emailRedirectTo: redirectUrl,
-          data: {
-            firstName: userData.firstName,
-            lastName: userData.lastName,
-            phone: userData.phone,
-            residency: userData.residency,
-            investmentIntent: userData.investmentIntent,
-            isAccredited: userData.isAccredited,
-            referralSource: userData.referralSource,
-            role: 'investor'
-          }
-        }
+        phone: userData.phone,
       });
-      
-      if (error) throw error;
-      navigate('/auth?verify=true');
-    } catch (error) {
-      console.error('Registration error:', error);
-      throw error;
+      await loadUser(credential.user);
+      navigate("/auth?verify=true");
     } finally {
       setLoading(false);
     }
   };
 
   const logout = async () => {
-    try {
-      await supabase.auth.signOut();
-      setUser(null);
-      setSession(null);
-      navigate('/auth');
-    } catch (error) {
-      console.error('Logout error:', error);
-    }
+    await firebaseSignOut(auth);
+    setUser(null);
+    navigate("/auth");
   };
 
   const resetPassword = async (email: string) => {
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth?reset=true`,
-      });
-      
-      if (error) throw error;
-    } catch (error) {
-      console.error('Password reset error:', error);
-      throw error;
-    }
+    await sendPasswordResetEmail(auth, email);
   };
 
+  // Google/GitHub/Twitter sign-in providers are not yet configured on
+  // Identity Platform (deferred to when the production domain is known —
+  // see backend README). These will throw a Firebase "operation not
+  // supported" error until that's done.
   const signInWithGoogle = async () => {
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/dashboard`
-        }
-      });
-      
-      if (error) throw error;
-    } catch (error) {
-      console.error('Google sign in error:', error);
-      throw error;
-    }
+    await signInWithPopup(auth, new GoogleAuthProvider());
+    navigate("/dashboard");
   };
-
   const signInWithGitHub = async () => {
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'github',
-        options: {
-          redirectTo: `${window.location.origin}/dashboard`
-        }
-      });
-      
-      if (error) throw error;
-    } catch (error) {
-      console.error('GitHub sign in error:', error);
-      throw error;
-    }
+    await signInWithPopup(auth, new GithubAuthProvider());
+    navigate("/dashboard");
   };
-
   const signInWithTwitter = async () => {
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'twitter',
-        options: {
-          redirectTo: `${window.location.origin}/dashboard`
-        }
-      });
-      
-      if (error) throw error;
-    } catch (error) {
-      console.error('Twitter sign in error:', error);
-      throw error;
-    }
+    await signInWithPopup(auth, new TwitterAuthProvider());
+    navigate("/dashboard");
   };
 
-  // Authorization functions
-  const hasPermission = (permission: string): boolean => {
-    return user?.permissions?.includes(permission) || false;
+  const refreshUser = async () => {
+    if (firebaseUser) await loadUser(firebaseUser);
   };
 
-  const hasRole = (role: string): boolean => {
-    // Check both metadata role and database roles
-    return user?.role === role || user?.roles?.includes(role) || false;
-  };
+  const hasRole = (role: string): boolean => user?.roles.includes(role) ?? false;
 
-  const canAccess = (resource: string, action: string = 'read'): boolean => {
+  const canAccess = (resource: string, action: string = "read"): boolean => {
     if (!user) return false;
-    
-    // Admin can access everything (check both sources)
-    if (user.role === 'admin' || user.roles?.includes('admin')) return true;
-    
-    // Check specific permissions
-    const permission = `${resource}:${action}`;
-    return hasPermission(permission) || hasPermission(`${resource}:*`);
+    if (hasRole("admin")) return true;
+    // Every remaining resource/action pair maps to "any authenticated user
+    // may act on their own rows" — the backend's authz layer is what
+    // actually scopes that to the caller's own uid. Write access to other
+    // users' data (profiles, accounts) is admin-only.
+    if (resource === "profiles" || resource === "accounts") return action === "read";
+    return true;
   };
 
-  const value = {
+  const value: AuthContextType = {
     user,
-    session,
+    firebaseUser,
     loading,
     login,
     register,
@@ -307,8 +209,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signInWithGoogle,
     signInWithGitHub,
     signInWithTwitter,
+    refreshUser,
     isAuthenticated: !!user,
-    hasPermission,
     hasRole,
     canAccess,
   };

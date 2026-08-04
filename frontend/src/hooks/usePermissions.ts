@@ -1,11 +1,10 @@
 import { useAuth } from '@/contexts/AuthContext';
 
 export const usePermissions = () => {
-  const { user, hasPermission, hasRole, canAccess } = useAuth();
+  const { user, hasRole, canAccess } = useAuth();
 
   return {
     user,
-    hasPermission,
     hasRole,
     canAccess,
     isAdmin: () => hasRole('admin'),
@@ -15,6 +14,10 @@ export const usePermissions = () => {
     canManageProfiles: () => canAccess('profiles', 'write'),
     canViewTransactions: () => canAccess('transactions', 'read'),
     canManageAccounts: () => canAccess('accounts', 'write'),
-    canAccessAdmin: () => hasRole('admin') || hasPermission('admin:access'),
+    // Was `hasRole('admin') || hasPermission('admin:access')` — the
+    // permission-string path came from the same spoofable user_metadata
+    // source as the old role check, so it's gone along with it. Admin
+    // access is role-only now.
+    canAccessAdmin: () => hasRole('admin'),
   };
 };
