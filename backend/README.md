@@ -6,7 +6,7 @@ Identity Platform, fronted by this API — the client no longer talks to the
 database directly, so there's no RLS layer; the equivalent rules live in
 [`src/authz/policies.ts`](./src/authz/policies.ts), enforced on every route.
 
-## What's here (Phase 2/3 scaffold)
+## What's here (Phase 2/3, extended during Phase 4)
 
 - **Schema** (`src/db/schema.ts`) — full port of all 14 tables from the
   original 13 Supabase migrations (in `/legacy-supabase/migrations`), with
@@ -20,23 +20,34 @@ database directly, so there's no RLS layer; the equivalent rules live in
   unlike the old public Supabase bucket — the GCP org's Domain Restricted
   Sharing policy blocks public IAM bindings on buckets, so this uses the
   same signed-URL model uniformly across all three instead).
-- **Routes implemented**: `/me`, `/profiles/*` (incl. the post-signup
-  bootstrap replacing the old `handle_new_user()` trigger), `/offerings/*`
-  (list/get/create/update, milestones, media, capital-calls, updates),
+- **Routes**: every table has a corresponding route, covering everything
+  the frontend actually needs (built out incrementally while porting each
+  frontend file — see git log for the specific gaps each addition closed).
+  `/me`, `/profiles/*` (+ `/profiles` admin list, `/profiles/:id/kyc-status`),
+  `/offerings/*` (list/get/create/update, investor-count, milestones incl.
+  bulk PUT, media incl. upload-url + delete, capital-calls, updates),
   `/investments/*`, `/transactions/*`, `/documents/*` (generic +
-  offering-scoped, with the verified-investor gate), `/verification-documents/*`
-  + `/verification-history` (including the review flow that used to be a
-  Postgres trigger, now explicit), `/compliance-screening/*` (with the
-  approval-ordering fix — see schema.ts comment on
-  `complianceScreeningDocuments`).
+  offering-scoped incl. upload-url, with the verified-investor gate),
+  `/verification-documents/*` + `/verification-history` (the review flow
+  also flips the matching `profiles.*_verified` flag — see the comment on
+  that route for why that moved server-side), `/compliance-screening/*`
+  (approval-ordering fix — see schema.ts comment on
+  `complianceScreeningDocuments`), `/user-roles` (admin), `/storage/signed-url`
+  (generic path-based signing for on-demand preview/download flows).
+- Two functional bugs fixed during the port, both from the same root
+  cause (the original `profiles` UPDATE RLS policy had no admin
+  exception, ever): admin document-review approval and the KYC toggle in
+  `UserManagement.tsx` both silently failed to update the target user's
+  profile in production. Fixed by moving both into admin-authorized
+  backend actions instead of a second client-side update call.
 
 ## What's NOT here yet
 
 - Automated tests (unit tests for `authz/policies.ts` against each of the
   14 tables' original RLS policies would be the highest-value first pass).
 - Rate limiting / abuse protection on write endpoints.
-- The Google Sign-In Identity Platform provider (deferred to Phase 4 —
-  needs the real production domain for the OAuth redirect URI).
+- The Google Sign-In Identity Platform provider (deferred — needs the real
+  production domain for the OAuth redirect URI).
 - Deployed to Cloud Run — Dockerfile exists but hasn't been built/deployed
   yet.
 
