@@ -11,11 +11,13 @@ of each half; this file is just the map.
 ## Structure
 
 ```
-frontend/           React 18 + Vite + shadcn/ui SPA
-backend/             Fastify + TypeScript + Drizzle API (Cloud Run)
-legacy-supabase/    Original Supabase migrations + Edge Function, kept for
-                     reference only — not part of the running system
+frontend/    React 18 + Vite + shadcn/ui SPA
+backend/     Fastify + TypeScript + Drizzle API (Cloud Run)
 ```
+
+The original Supabase migrations and Edge Function (this app's previous
+backend) are no longer in the repo — see git history prior to the
+`rebuild/gcp-native` branch if you need to reference them.
 
 ## Stack
 

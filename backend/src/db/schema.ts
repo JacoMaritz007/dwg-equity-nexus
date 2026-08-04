@@ -1,7 +1,7 @@
-// Postgres schema for equity-nexus, ported from the original 13 Supabase
-// migrations (see /legacy-supabase/migrations for the source of truth this
-// was translated from). Two deliberate deviations from the original SQL,
-// both fixes rather than faithful ports:
+// Postgres schema for equity-nexus, ported from the original app's 13
+// Supabase migrations (see git history predating the rebuild for the
+// source SQL). Two deliberate deviations from the original, both fixes
+// rather than faithful ports:
 //
 // 1. The original migrations declare TWO different enums both named
 //    `document_type` (one for `documents`, one for `verification_documents`,

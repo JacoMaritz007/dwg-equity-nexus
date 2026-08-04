@@ -1,7 +1,6 @@
-// Authorization rules, ported 1:1 from the RLS policies in
-// /legacy-supabase/migrations. Each function below is documented with the
-// exact policy it replaces, so this file can be diffed against the
-// migrations to confirm nothing was dropped or loosened in the port.
+// Authorization rules, ported 1:1 from the original app's Supabase RLS
+// policies (see git history predating the rebuild for the source SQL).
+// Each function below is documented with the exact policy it replaces.
 //
 // This is the ONE place where these rules should live. Routes call these
 // functions rather than re-deriving access logic inline — that's what makes

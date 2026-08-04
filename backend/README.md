@@ -9,7 +9,9 @@ database directly, so there's no RLS layer; the equivalent rules live in
 ## What's here (Phase 2/3, extended during Phase 4)
 
 - **Schema** (`src/db/schema.ts`) — full port of all 14 tables from the
-  original 13 Supabase migrations (in `/legacy-supabase/migrations`), with
+  original 13 Supabase migrations (see git history predating
+  `rebuild/gcp-native` for the source SQL — removed from the working tree
+  once the port was verified complete), with
   two intentional fixes documented at the top of that file.
 - **Auth** (`src/auth/verify-token.ts`) — verifies Identity Platform ID
   tokens via `firebase-admin`.
