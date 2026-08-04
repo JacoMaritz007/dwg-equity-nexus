@@ -15,19 +15,30 @@ database directly, so there's no RLS layer; the equivalent rules live in
   tokens via `firebase-admin`.
 - **Authorization** (`src/authz/policies.ts`) — every original RLS policy,
   ported to a plain function, annotated with which policy it replaces.
-- **Routes implemented so far**: `/me`, `/profiles/*` (incl. the
-  post-signup bootstrap that replaces the old `handle_new_user()` trigger),
-  `/offerings/*` (list/get/create/update, milestones, media).
+- **Storage** (`src/storage/signed-urls.ts`) — signed read/upload URLs for
+  all three Cloud Storage buckets, including `offering-media` (private here,
+  unlike the old public Supabase bucket — the GCP org's Domain Restricted
+  Sharing policy blocks public IAM bindings on buckets, so this uses the
+  same signed-URL model uniformly across all three instead).
+- **Routes implemented**: `/me`, `/profiles/*` (incl. the post-signup
+  bootstrap replacing the old `handle_new_user()` trigger), `/offerings/*`
+  (list/get/create/update, milestones, media, capital-calls, updates),
+  `/investments/*`, `/transactions/*`, `/documents/*` (generic +
+  offering-scoped, with the verified-investor gate), `/verification-documents/*`
+  + `/verification-history` (including the review flow that used to be a
+  Postgres trigger, now explicit), `/compliance-screening/*` (with the
+  approval-ordering fix — see schema.ts comment on
+  `complianceScreeningDocuments`).
 
-## What's NOT here yet (rest of Phase 2)
+## What's NOT here yet
 
-Routes for: `user_investments`, `transactions`, `documents`,
-`investment_updates`, `capital_calls`, `offering_documents`,
-`verification_documents` + `verification_history`,
-`compliance_screening_documents` (including the fixed screening-approval
-flow described in schema.ts), and signed-URL generation for the three
-Cloud Storage buckets. Same pattern as `offerings.ts` — straightforward
-to add following that template.
+- Automated tests (unit tests for `authz/policies.ts` against each of the
+  14 tables' original RLS policies would be the highest-value first pass).
+- Rate limiting / abuse protection on write endpoints.
+- The Google Sign-In Identity Platform provider (deferred to Phase 4 —
+  needs the real production domain for the OAuth redirect URI).
+- Deployed to Cloud Run — Dockerfile exists but hasn't been built/deployed
+  yet.
 
 ## Local development
 

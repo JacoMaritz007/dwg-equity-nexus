@@ -5,6 +5,11 @@ import authPlugin from "./plugins/auth-plugin.js";
 import { AuthzError } from "./authz/policies.js";
 import profilesRoutes from "./routes/profiles.js";
 import offeringsRoutes from "./routes/offerings.js";
+import investmentsRoutes from "./routes/investments.js";
+import documentsRoutes from "./routes/documents.js";
+import verificationRoutes from "./routes/verification.js";
+import complianceRoutes from "./routes/compliance.js";
+import offeringExtrasRoutes from "./routes/offering-extras.js";
 
 const fastify = Fastify({ logger: true });
 
@@ -19,6 +24,11 @@ fastify.get("/health", { config: { public: true } }, async () => ({ status: "ok"
 await fastify.register(authPlugin);
 await fastify.register(profilesRoutes);
 await fastify.register(offeringsRoutes);
+await fastify.register(investmentsRoutes);
+await fastify.register(documentsRoutes);
+await fastify.register(verificationRoutes);
+await fastify.register(complianceRoutes);
+await fastify.register(offeringExtrasRoutes);
 
 fastify.setErrorHandler((err, _request, reply) => {
   if (err instanceof AuthzError) {
