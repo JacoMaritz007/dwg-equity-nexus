@@ -2,7 +2,7 @@ import type { FastifyPluginAsync } from "fastify";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db/client.js";
-import { userInvestments, investmentOfferings, transactions } from "../db/schema.js";
+import { userInvestments, investmentOfferings, transactions, profiles } from "../db/schema.js";
 import {
   canViewInvestment,
   canUpdateInvestment,
@@ -47,7 +47,17 @@ const investmentsRoutes: FastifyPluginAsync = async (fastify) => {
   // "Users can create their own investments" — WITH CHECK (auth.uid() = user_id)
   fastify.post("/investments", async (request, reply) => {
     const body = createInvestmentSchema.parse(request.body);
-    assertCanCreateInvestment(request.actor, body.userId);
+
+    const investorProfile = await db.query.profiles.findFirst({
+      where: eq(profiles.id, body.userId),
+    });
+    assertCanCreateInvestment(request.actor, body.userId, {
+      identityVerified: Boolean(investorProfile?.identityVerified),
+      addressVerified: Boolean(investorProfile?.addressVerified),
+      financialVerified: Boolean(investorProfile?.financialVerified),
+      pepScreened: Boolean(investorProfile?.pepScreened),
+      sanctionsScreened: Boolean(investorProfile?.sanctionsScreened),
+    });
 
     const offering = await db.query.investmentOfferings.findFirst({
       where: eq(investmentOfferings.id, body.offeringId),

@@ -70,8 +70,40 @@ export function assertCanManageOfferings(actor: Actor): void {
 export function canViewInvestment(actor: Actor, investmentUserId: string): boolean {
   return actor.uid === investmentUserId || isAdmin(actor);
 }
-export function assertCanCreateInvestment(actor: Actor, forUserId: string): void {
+// Mirrors the client's useVerificationStatus `can_invest` calculation, but actually
+// enforced server-side — previously nothing stopped a direct POST /investments call
+// from an unverified user, since the frontend only ever hid the Invest button. Takes
+// pre-fetched flags rather than querying itself, same pattern as
+// canViewOfferingDocument's investorProfile param — this module stays pure/sync, the
+// route does the one DB read. Reads profiles.*_verified/*_screened, which
+// verification.ts's /review route and compliance.ts's /confirm-upload route already
+// maintain as the authoritative state.
+export interface InvestmentEligibility {
+  identityVerified: boolean;
+  addressVerified: boolean;
+  financialVerified: boolean;
+  pepScreened: boolean;
+  sanctionsScreened: boolean;
+}
+export function canInvest(eligibility: InvestmentEligibility): boolean {
+  return (
+    eligibility.identityVerified &&
+    eligibility.addressVerified &&
+    eligibility.financialVerified &&
+    eligibility.pepScreened &&
+    eligibility.sanctionsScreened
+  );
+}
+export function assertCanCreateInvestment(
+  actor: Actor,
+  forUserId: string,
+  eligibility: InvestmentEligibility,
+): void {
   assert(actor.uid === forUserId, "Can only create investments for yourself");
+  assert(
+    canInvest(eligibility),
+    "Complete identity, address, and financial verification, plus PEP and sanctions screening, before investing",
+  );
 }
 export function canUpdateInvestment(actor: Actor, investmentUserId: string): boolean {
   return actor.uid === investmentUserId || isAdmin(actor);
