@@ -32,7 +32,7 @@ const AdminDashboard: React.FC = () => {
   const stats = [
     {
       title: "Total Investments",
-      value: "$2.4M",
+      value: "R2.4M",
       change: "+12.5%",
       icon: DollarSign,
       color: "text-green-600"

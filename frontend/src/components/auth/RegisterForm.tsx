@@ -219,10 +219,10 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onShowLogin }) => {
                   <SelectValue placeholder="Select investment range" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="50k-100k">$50K - $100K</SelectItem>
-                  <SelectItem value="100k-250k">$100K - $250K</SelectItem>
-                  <SelectItem value="250k-500k">$250K - $500K</SelectItem>
-                  <SelectItem value="500k+">$500K+</SelectItem>
+                  <SelectItem value="50k-100k">R50K - R100K</SelectItem>
+                  <SelectItem value="100k-250k">R100K - R250K</SelectItem>
+                  <SelectItem value="250k-500k">R250K - R500K</SelectItem>
+                  <SelectItem value="500k+">R500K+</SelectItem>
                 </SelectContent>
               </Select>
             </div>
