@@ -21,7 +21,14 @@ database directly, so there's no RLS layer; the equivalent rules live in
   all three Cloud Storage buckets, including `offering-media` (private here,
   unlike the old public Supabase bucket — the GCP org's Domain Restricted
   Sharing policy blocks public IAM bindings on buckets, so this uses the
-  same signed-URL model uniformly across all three instead).
+  same signed-URL model uniformly across all three instead). The frontend
+  PUTs directly to the signed URL (`lib/api-client.ts`'s `uploadFile`),
+  bypassing this API entirely — that means the bucket itself, not this
+  server, needs a CORS policy allowing the frontend's origin(s), or the
+  browser blocks the preflight before the request ever reaches Cloud
+  Storage. See `gcs-cors.json` in this directory; apply it with
+  `gcloud storage buckets update gs://<bucket> --cors-file=gcs-cors.json`
+  on all three buckets whenever a new frontend origin comes online.
 - **Routes**: every table has a corresponding route, covering everything
   the frontend actually needs (built out incrementally while porting each
   frontend file — see git log for the specific gaps each addition closed).

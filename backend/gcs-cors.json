@@ -1,0 +1,12 @@
+[
+  {
+    "origin": [
+      "https://app.gainscape.co.za",
+      "https://equity-nexus.web.app",
+      "http://localhost:5173"
+    ],
+    "method": ["GET", "PUT", "HEAD"],
+    "responseHeader": ["Content-Type"],
+    "maxAgeSeconds": 3600
+  }
+]
