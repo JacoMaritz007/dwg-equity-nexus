@@ -27,6 +27,7 @@ import {
 import { AdminScreeningModal } from '@/components/admin/AdminScreeningModal';
 import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/api-client';
+import { formatCurrency } from '@/utils/offeringHelpers';
 import { 
   Search, 
   MoreHorizontal, 
@@ -250,16 +251,6 @@ const UserManagement: React.FC = () => {
     return matchesSearch && matchesTab;
   });
 
-  const formatCurrency = (amount: number | undefined) => {
-    if (!amount) return '$0';
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
-
   const getRoleBadgeColor = (role: string) => {
     switch (role) {
       case 'admin': return 'bg-red-100 text-red-800';
@@ -463,7 +454,7 @@ const UserManagement: React.FC = () => {
                       <TableCell>
                         <div className="text-sm">
                           <p className="font-medium">
-                            {formatCurrency(user.total_invested)}
+                            {formatCurrency(user.total_invested || 0)}
                           </p>
                           <p className="text-muted-foreground">
                             {user.active_investments} active

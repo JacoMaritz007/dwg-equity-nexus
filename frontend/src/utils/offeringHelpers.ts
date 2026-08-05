@@ -25,16 +25,6 @@ export const transformOfferingForDisplay = (offering: InvestmentOfferingWithDeta
     ? Math.min(((offering.raised_amount || 0) / offering.target_amount) * 100, 100)
     : 0;
 
-  // Format currency values
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
-
   // Get primary image from media - check for featured_image type first
   let primaryImage = '/api/placeholder/400/250';
   
@@ -117,9 +107,9 @@ export const getStatusColor = (status: string) => {
 };
 
 export const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat('en-US', {
+  return new Intl.NumberFormat('en-ZA', {
     style: 'currency',
-    currency: 'USD',
+    currency: 'ZAR',
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(amount);
