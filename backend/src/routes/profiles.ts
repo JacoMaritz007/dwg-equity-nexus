@@ -8,7 +8,12 @@ import { canViewProfile, assertCanUpdateProfile, assertAdmin, AuthzError } from 
 const bootstrapSchema = z.object({
   firstName: z.string().min(1),
   lastName: z.string().min(1),
-  email: z.string().email(),
+  // Lowercased so every lookup-by-email downstream (admin tooling, future
+  // search/reset flows) can rely on exact match — Postgres text equality
+  // is case-sensitive, and Identity Platform preserves whatever casing was
+  // typed at signup, so without this two accounts for the "same" email can
+  // silently fail to match each other.
+  email: z.string().email().transform((v) => v.toLowerCase()),
   phone: z.string().optional(),
 });
 

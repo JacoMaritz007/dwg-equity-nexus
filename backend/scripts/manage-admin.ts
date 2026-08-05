@@ -21,14 +21,17 @@ function flag(name: string): string | undefined {
   return arg?.slice(name.length + 3);
 }
 
-const email = process.argv[2];
+const rawEmail = process.argv[2];
 const grant = process.argv.includes("--grant-admin");
 const repairUid = flag("repair-uid");
 
-if (!email) {
+if (!rawEmail) {
   console.error("Usage: npx tsx --env-file=.env scripts/manage-admin.ts <email> [--grant-admin]");
   process.exit(1);
 }
+// Match the backend's normalization (profiles.ts's bootstrap schema) —
+// stored emails are lowercase going forward, so search with the same case.
+const email = rawEmail.toLowerCase();
 
 let profile = await db.query.profiles.findFirst({ where: eq(profiles.email, email) });
 
