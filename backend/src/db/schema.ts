@@ -135,6 +135,12 @@ export const profiles = pgTable("profiles", {
   placeOfBirth: text("place_of_birth"),
   occupation: text("occupation"),
   employer: text("employer"),
+  // Set once the client submits the AML self-declaration questionnaire (source of
+  // wealth, PEP status, etc). Distinguishes "hasn't started AML" from "submitted,
+  // awaiting admin PEP/sanctions screening" — pepScreened/sanctionsScreened below
+  // only flip once an admin completes that screening, so without this there was no
+  // way to tell those two states apart.
+  amlQuestionnaireCompletedAt: timestamp("aml_questionnaire_completed_at", { withTimezone: true }),
 
   identityVerified: boolean("identity_verified").default(false),
   addressVerified: boolean("address_verified").default(false),
