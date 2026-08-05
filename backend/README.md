@@ -50,8 +50,6 @@ database directly, so there's no RLS layer; the equivalent rules live in
 - Rate limiting / abuse protection on write endpoints.
 - The Google Sign-In Identity Platform provider (deferred — needs the real
   production domain for the OAuth redirect URI).
-- Deployed to Cloud Run — Dockerfile exists but hasn't been built/deployed
-  yet.
 
 ## Local development
 
@@ -71,16 +69,26 @@ Application Default Credentials).
 
 ## Deploy
 
+Env vars live in `.env.cloudrun.yaml` (not `--set-env-vars` — several values,
+like `INSTANCE_CONNECTION_NAME`, contain colons, which collide with gcloud's
+comma/colon delimiter syntax once `ALLOWED_ORIGINS` also needs commas).
+Update that file's `ALLOWED_ORIGINS` list whenever a new frontend origin
+comes online, then:
+
 ```bash
 gcloud run deploy equity-nexus-api \
   --source . \
   --region=africa-south1 \
   --project=equity-nexus \
-  --set-env-vars=GCP_PROJECT_ID=equity-nexus,INSTANCE_CONNECTION_NAME=equity-nexus:africa-south1:equity-nexus-db,DB_USER=app_user,DB_NAME=equity_nexus \
+  --service-account=equity-nexus-api@equity-nexus.iam.gserviceaccount.com \
+  --env-vars-file=.env.cloudrun.yaml \
   --set-secrets=DB_PASSWORD=db-app-user-password:latest \
   --allow-unauthenticated
 ```
 
 (`--allow-unauthenticated` is correct here — this API does its own auth via
 Identity Platform tokens per-request, it's not meant to sit behind Cloud
-Run's IAM gate.)
+Run's IAM gate. The project's org-level Domain Restricted Sharing policy
+blocks public IAM bindings by default; `equity-nexus` has a project-scoped
+override for `iam.allowedPolicyMemberDomains` allowing it, same as the
+Cloud Storage buckets.)
