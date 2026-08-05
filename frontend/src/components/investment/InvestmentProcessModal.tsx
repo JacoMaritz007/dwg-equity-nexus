@@ -24,6 +24,7 @@ import { useVerificationStatus } from '@/hooks/useVerificationStatus';
 import { api } from '@/lib/api-client';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
+import { formatCurrency } from '@/utils/offeringHelpers';
 
 interface InvestmentProcessModalProps {
   offering: InvestmentOfferingWithDetails;
@@ -282,11 +283,11 @@ export const InvestmentProcessModal: React.FC<InvestmentProcessModalProps> = ({
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="text-sm font-medium">Minimum Investment</label>
-                    <p className="text-lg font-bold">${offering.minimum_investment?.toLocaleString()}</p>
+                    <p className="text-lg font-bold">{formatCurrency(offering.minimum_investment || 0)}</p>
                   </div>
                   <div>
                     <label className="text-sm font-medium">Maximum Investment</label>
-                    <p className="text-lg font-bold">${offering.maximum_investment?.toLocaleString()}</p>
+                    <p className="text-lg font-bold">{formatCurrency(offering.maximum_investment || 0)}</p>
                   </div>
                 </div>
                 
@@ -338,7 +339,7 @@ export const InvestmentProcessModal: React.FC<InvestmentProcessModalProps> = ({
                 <div className="p-4 border rounded-lg">
                   <h4 className="font-medium mb-2">Subscription Agreement</h4>
                   <p className="text-sm text-muted-foreground mb-3">
-                    Investment Amount: ${investmentAmount.toLocaleString()}
+                    Investment Amount: {formatCurrency(investmentAmount)}
                   </p>
                   <Button variant="outline" className="w-full">
                     <PenTool className="mr-2 h-4 w-4" />
@@ -371,15 +372,15 @@ export const InvestmentProcessModal: React.FC<InvestmentProcessModalProps> = ({
                   <div className="space-y-1 text-sm">
                     <div className="flex justify-between">
                       <span>Investment Amount:</span>
-                      <span className="font-medium">${investmentAmount.toLocaleString()}</span>
+                      <span className="font-medium">{formatCurrency(investmentAmount)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Processing Fee:</span>
-                      <span className="font-medium">$0</span>
+                      <span className="font-medium">{formatCurrency(0)}</span>
                     </div>
                     <div className="flex justify-between border-t pt-2 font-medium">
                       <span>Total Due:</span>
-                      <span>${investmentAmount.toLocaleString()}</span>
+                      <span>{formatCurrency(investmentAmount)}</span>
                     </div>
                   </div>
                 </div>

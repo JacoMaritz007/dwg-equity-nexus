@@ -18,6 +18,7 @@ import {
   Clock
 } from 'lucide-react';
 import { useTransactions } from '@/hooks/useTransactions';
+import { formatCurrency } from '@/utils/offeringHelpers';
 
 export const TransactionsPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -43,7 +44,7 @@ export const TransactionsPage: React.FC = () => {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${accountSummary.cashAvailable.toLocaleString()}</div>
+            <div className="text-2xl font-bold">{formatCurrency(accountSummary.cashAvailable)}</div>
             <p className="text-xs text-muted-foreground">Available for investment</p>
           </CardContent>
         </Card>
@@ -53,7 +54,7 @@ export const TransactionsPage: React.FC = () => {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${accountSummary.totalInvestments.toLocaleString()}</div>
+            <div className="text-2xl font-bold">{formatCurrency(accountSummary.totalInvestments)}</div>
             <p className="text-xs text-success">Active portfolio value</p>
           </CardContent>
         </Card>
@@ -63,7 +64,7 @@ export const TransactionsPage: React.FC = () => {
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${accountSummary.pendingDistributions.toLocaleString()}</div>
+            <div className="text-2xl font-bold">{formatCurrency(accountSummary.pendingDistributions)}</div>
             <p className="text-xs text-muted-foreground">Awaiting distribution</p>
           </CardContent>
         </Card>
@@ -73,7 +74,7 @@ export const TransactionsPage: React.FC = () => {
             <TrendingDown className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${accountSummary.recentCapitalCalls.toLocaleString()}</div>
+            <div className="text-2xl font-bold">{formatCurrency(accountSummary.recentCapitalCalls)}</div>
             <p className="text-xs text-muted-foreground">Capital call payments</p>
           </CardContent>
         </Card>
@@ -194,7 +195,7 @@ export const TransactionsPage: React.FC = () => {
                         transaction.type === 'distribution' ? 'text-success' : 
                         ['contribution', 'fee', 'expense'].includes(transaction.type) ? 'text-destructive' : ''
                       }`}>
-                        {transaction.type === 'distribution' ? '+' : '-'}${Math.abs(transaction.amount).toLocaleString()}
+                        {transaction.type === 'distribution' ? '+' : '-'}{formatCurrency(Math.abs(transaction.amount))}
                       </p>
                        <Badge variant="default" className="text-xs">
                          Completed

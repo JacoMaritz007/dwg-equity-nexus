@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { useInvestmentOfferings } from '@/hooks/useInvestmentOfferings';
 import { useVerificationStatus } from '@/hooks/useVerificationStatus';
-import { transformOfferingForDisplay } from '@/utils/offeringHelpers';
+import { transformOfferingForDisplay, formatCurrency } from '@/utils/offeringHelpers';
 import { OfferingDisplayData } from '@/types/investment';
 import { toast } from 'sonner';
 
@@ -132,7 +132,7 @@ export const InvestPage: React.FC = () => {
         {offering.status === 'active' && (
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Raised: ${offering.raisedAmount.toLocaleString()}</span>
+              <span className="text-muted-foreground">Raised: {formatCurrency(offering.raisedAmount)}</span>
               <span className="font-medium">{offering.raisedPercentage}%</span>
             </div>
             <div className="w-full bg-muted rounded-full h-2">

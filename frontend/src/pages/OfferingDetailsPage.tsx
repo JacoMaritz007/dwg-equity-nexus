@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { useInvestmentOfferings } from '@/hooks/useInvestmentOfferings';
 import { InvestmentOfferingWithDetails } from '@/types/investment';
-import { transformOfferingForDisplay, getStatusColor } from '@/utils/offeringHelpers';
+import { transformOfferingForDisplay, getStatusColor, formatCurrency } from '@/utils/offeringHelpers';
 import { useVerificationStatus } from '@/hooks/useVerificationStatus';
 import { Navigation } from '@/components/layout/Navigation';
 import { InvestmentProcessModal } from '@/components/investment/InvestmentProcessModal';
@@ -242,7 +242,7 @@ export const OfferingDetailsPage: React.FC = () => {
                     />
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="font-medium">${displayData.raisedAmount.toLocaleString()}</span>
+                    <span className="font-medium">{formatCurrency(displayData.raisedAmount)}</span>
                     <span className="text-muted-foreground">raised</span>
                   </div>
                 </CardContent>
@@ -486,7 +486,7 @@ export const OfferingDetailsPage: React.FC = () => {
                       <div className="p-3 border rounded-lg">
                         <p className="text-sm text-muted-foreground">Maximum Investment</p>
                         <p className="text-lg font-bold">
-                          ${offering.maximum_investment.toLocaleString()}
+                          {formatCurrency(offering.maximum_investment)}
                         </p>
                       </div>
                     )}
