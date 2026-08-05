@@ -32,20 +32,29 @@ if (!email) {
 
 let profile = await db.query.profiles.findFirst({ where: eq(profiles.email, email) });
 
+// Email match can miss a row that's actually there (case/whitespace
+// differences from whatever was typed at signup time) — the uid is the
+// real identity, so check it directly before assuming nothing exists.
 if (!profile && repairUid) {
-  const firstName = flag("first-name");
-  const lastName = flag("last-name");
-  if (!firstName || !lastName) {
-    console.error("--repair-uid requires --first-name and --last-name too.");
-    await closeDb();
-    process.exit(1);
+  const byUid = await db.query.profiles.findFirst({ where: eq(profiles.id, repairUid) });
+  if (byUid) {
+    profile = byUid;
+    console.log(`Found existing profile by uid (email on file: ${byUid.email}) — not creating a duplicate.`);
+  } else {
+    const firstName = flag("first-name");
+    const lastName = flag("last-name");
+    if (!firstName || !lastName) {
+      console.error("--repair-uid requires --first-name and --last-name too.");
+      await closeDb();
+      process.exit(1);
+    }
+    [profile] = await db
+      .insert(profiles)
+      .values({ id: repairUid, firstName, lastName, email })
+      .returning();
+    await db.insert(userRoles).values({ userId: repairUid, role: "investor" });
+    console.log(`Created missing profile for ${email} (uid=${repairUid}).`);
   }
-  [profile] = await db
-    .insert(profiles)
-    .values({ id: repairUid, firstName, lastName, email })
-    .returning();
-  await db.insert(userRoles).values({ userId: repairUid, role: "investor" });
-  console.log(`Created missing profile for ${email} (uid=${repairUid}).`);
 }
 
 if (!profile) {
