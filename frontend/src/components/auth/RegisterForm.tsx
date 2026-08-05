@@ -204,6 +204,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onShowLogin }) => {
                   <SelectValue placeholder="Select your residency" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="za">South Africa</SelectItem>
                   <SelectItem value="us">United States</SelectItem>
                   <SelectItem value="ca">Canada</SelectItem>
                   <SelectItem value="uk">United Kingdom</SelectItem>
