@@ -19,13 +19,14 @@ import {
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { DocumentUploadModal } from '@/components/documents/DocumentUploadModal';
+import { AmlQuestionnaireModal } from '@/components/verification/AmlQuestionnaireModal';
 import { useVerificationStatus } from '@/hooks/useVerificationStatus';
 import { VerificationStatusCard } from '@/components/verification/VerificationStatusCard';
 
 const VerificationCard: React.FC<{
   title: string;
   description: string;
-  status: 'verified' | 'pending' | 'required' | 'expired';
+  status: 'verified' | 'pending' | 'required' | 'expired' | 'rejected';
   icon: React.ReactNode;
   action?: React.ReactNode;
   lastUpdate?: string;
@@ -47,6 +48,12 @@ const VerificationCard: React.FC<{
       case 'expired':
         return {
           badge: <Badge variant="destructive">Expired</Badge>,
+          iconColor: 'text-destructive',
+          borderColor: 'border-destructive/20'
+        };
+      case 'rejected':
+        return {
+          badge: <Badge variant="destructive">Rejected — resubmit</Badge>,
           iconColor: 'text-destructive',
           borderColor: 'border-destructive/20'
         };
@@ -92,6 +99,7 @@ const VerificationCard: React.FC<{
 export const AccountStatusPage: React.FC = () => {
   const { status: verificationStatus, loading, refetch } = useVerificationStatus();
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [amlModalOpen, setAmlModalOpen] = useState(false);
   const [selectedDocumentCategory, setSelectedDocumentCategory] = useState<'identity' | 'address' | 'financial' | undefined>();
 
   const handleUploadClick = (category: 'identity' | 'address' | 'financial') => {
@@ -101,6 +109,10 @@ export const AccountStatusPage: React.FC = () => {
 
   const handleUploadSuccess = () => {
     // Refresh verification status after successful upload
+    refetch();
+  };
+
+  const handleAmlSuccess = () => {
     refetch();
   };
 
@@ -145,7 +157,7 @@ export const AccountStatusPage: React.FC = () => {
         <VerificationCard
           title="Identity Verification"
           description="Verify your identity with government-issued ID"
-          status={verificationStatus?.identity_verified ? 'verified' : 'required'}
+          status={verificationStatus?.identity_status ?? 'required'}
           icon={<User className="h-5 w-5" />}
           action={
             !verificationStatus?.identity_verified && (
@@ -165,7 +177,7 @@ export const AccountStatusPage: React.FC = () => {
         <VerificationCard
           title="Address Verification"
           description="Confirm your residential address"
-          status={verificationStatus?.address_verified ? 'verified' : 'required'}
+          status={verificationStatus?.address_status ?? 'required'}
           icon={<MapPin className="h-5 w-5" />}
           action={
             !verificationStatus?.address_verified && (
@@ -186,7 +198,7 @@ export const AccountStatusPage: React.FC = () => {
         <VerificationCard
           title="Financial Verification"
           description="Verify your financial status and source of wealth"
-          status={verificationStatus?.financial_verified ? 'verified' : 'required'}
+          status={verificationStatus?.financial_status ?? 'required'}
           icon={<CreditCard className="h-5 w-5" />}
           action={
             !verificationStatus?.financial_verified && (
@@ -207,7 +219,13 @@ export const AccountStatusPage: React.FC = () => {
         <VerificationCard
           title="PEP Screening"
           description="Politically Exposed Person screening"
-          status={verificationStatus?.pep_screened ? 'verified' : 'pending'}
+          status={
+            verificationStatus?.pep_screened
+              ? 'verified'
+              : verificationStatus?.aml_questionnaire_completed
+                ? 'pending'
+                : 'required'
+          }
           icon={<Shield className="h-5 w-5" />}
           action={
             verificationStatus?.pep_screened ? (
@@ -215,10 +233,20 @@ export const AccountStatusPage: React.FC = () => {
                 <Eye className="h-4 w-4 mr-2" />
                 View Results
               </Button>
-            ) : (
+            ) : verificationStatus?.aml_questionnaire_completed ? (
               <p className="text-sm text-muted-foreground">
-                Automated screening in progress
+                Submitted — awaiting compliance review
               </p>
+            ) : (
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-full"
+                onClick={() => setAmlModalOpen(true)}
+              >
+                <FileText className="h-4 w-4 mr-2" />
+                Complete AML Declaration
+              </Button>
             )
           }
         />
@@ -227,7 +255,13 @@ export const AccountStatusPage: React.FC = () => {
         <VerificationCard
           title="Sanctions Screening"
           description="International sanctions list verification"
-          status={verificationStatus?.sanctions_screened ? 'verified' : 'pending'}
+          status={
+            verificationStatus?.sanctions_screened
+              ? 'verified'
+              : verificationStatus?.aml_questionnaire_completed
+                ? 'pending'
+                : 'required'
+          }
           icon={<AlertCircle className="h-5 w-5" />}
           action={
             verificationStatus?.sanctions_screened ? (
@@ -235,10 +269,20 @@ export const AccountStatusPage: React.FC = () => {
                 <Eye className="h-4 w-4 mr-2" />
                 View Results
               </Button>
-            ) : (
+            ) : verificationStatus?.aml_questionnaire_completed ? (
               <p className="text-sm text-muted-foreground">
-                Automated screening in progress
+                Submitted — awaiting compliance review
               </p>
+            ) : (
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-full"
+                onClick={() => setAmlModalOpen(true)}
+              >
+                <FileText className="h-4 w-4 mr-2" />
+                Complete AML Declaration
+              </Button>
             )
           }
         />
@@ -312,6 +356,13 @@ export const AccountStatusPage: React.FC = () => {
         onClose={() => setUploadModalOpen(false)}
         documentCategory={selectedDocumentCategory}
         onSuccess={handleUploadSuccess}
+      />
+
+      {/* AML Declaration Modal */}
+      <AmlQuestionnaireModal
+        isOpen={amlModalOpen}
+        onClose={() => setAmlModalOpen(false)}
+        onSuccess={handleAmlSuccess}
       />
     </div>
   );
