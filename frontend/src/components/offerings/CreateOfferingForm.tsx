@@ -725,7 +725,7 @@ export const CreateOfferingForm: React.FC<CreateOfferingFormProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="target_amount">
-                  Target Amount ($) <span className="text-destructive">*</span>
+                  Target Amount (R) <span className="text-destructive">*</span>
                 </Label>
                 <Input
                   id="target_amount"
@@ -758,7 +758,7 @@ export const CreateOfferingForm: React.FC<CreateOfferingFormProps> = ({
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="minimum_investment">Minimum Investment Amount ($)</Label>
+                <Label htmlFor="minimum_investment">Minimum Investment Amount (R)</Label>
                 <Input
                   id="minimum_investment"
                   type="number"
@@ -768,7 +768,7 @@ export const CreateOfferingForm: React.FC<CreateOfferingFormProps> = ({
               </div>
 
               <div>
-                <Label htmlFor="maximum_investment">Maximum Investment Amount ($)</Label>
+                <Label htmlFor="maximum_investment">Maximum Investment Amount (R)</Label>
                 <Input
                   id="maximum_investment"
                   type="number"
