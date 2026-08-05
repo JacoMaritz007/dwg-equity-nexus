@@ -11,7 +11,8 @@ import {
   AlertCircle,
   Activity,
   BarChart3,
-  Calendar
+  Calendar,
+  Shield
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -87,6 +88,13 @@ const AdminDashboard: React.FC = () => {
       description: "Request additional capital from investors",
       href: "/admin/capital-calls/create",
       icon: Calendar,
+      variant: "outline" as const
+    },
+    {
+      title: "Compliance Queue",
+      description: "Review AML declarations awaiting PEP/sanctions screening",
+      href: "/admin/compliance",
+      icon: Shield,
       variant: "outline" as const
     }
   ];

@@ -21,6 +21,7 @@ import CreateOffering from "@/pages/admin/CreateOffering";
 import EditOffering from "@/pages/admin/EditOffering";
 import UserManagement from "@/pages/admin/UserManagement";
 import AdminDocuments from "@/pages/admin/AdminDocuments";
+import AdminCompliance from "@/pages/admin/AdminCompliance";
 import { OfferingDetailsPage } from "@/pages/OfferingDetailsPage";
 
 const queryClient = new QueryClient();
@@ -214,7 +215,16 @@ const App = () => (
                   </AuthorizedRoute>
                 }
               />
-              
+              <Route
+                path="/admin/compliance"
+                element={
+                  <AuthorizedRoute requiredRole="admin">
+                    <Navigation />
+                    <AdminCompliance />
+                  </AuthorizedRoute>
+                }
+              />
+
               {/* 404 Route */}
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
