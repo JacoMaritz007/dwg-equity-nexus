@@ -87,6 +87,11 @@ export const investorClassificationEnum = pgEnum("investor_classification", [
   "institutional",
 ]);
 export const riskRatingEnum = pgEnum("risk_rating", ["low", "medium", "high"]);
+export const dataDeletionRequestStatusEnum = pgEnum("data_deletion_request_status", [
+  "pending",
+  "approved",
+  "denied",
+]);
 export const verificationDocumentTypeEnum = pgEnum("verification_document_type", [
   "passport",
   "national_id",
@@ -124,7 +129,7 @@ export const profiles = pgTable("profiles", {
   city: text("city"),
   state: text("state"),
   zipCode: text("zip_code"),
-  country: text("country").default("US"),
+  country: text("country").default("ZA"),
   dateOfBirth: date("date_of_birth"),
   isAccredited: boolean("is_accredited").default(false),
   kycVerified: boolean("kyc_verified").default(false),
@@ -163,6 +168,18 @@ export const profiles = pgTable("profiles", {
   sanctionsScreened: boolean("sanctions_screened").default(false),
   verificationLevel: text("verification_level").default("basic"),
 
+  // Notification category toggles. No email-sending capability exists in
+  // this app yet — stored now so the preferences UI has something real to
+  // read/write, ready for whenever email delivery is actually built.
+  // Marketing defaults false (opt-in only) since POPIA, like most privacy
+  // law, treats direct marketing consent as something a user must
+  // affirmatively grant, not something assumed by default the way
+  // operational notifications are.
+  notifyNewOfferings: boolean("notify_new_offerings").notNull().default(true),
+  notifyCapitalCalls: boolean("notify_capital_calls").notNull().default(true),
+  notifyDocumentUpdates: boolean("notify_document_updates").notNull().default(true),
+  notifyMarketing: boolean("notify_marketing").notNull().default(false),
+
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -179,6 +196,28 @@ export const userRoles = pgTable(
   },
   (t) => [unique().on(t.userId, t.role)],
 );
+
+// POPIA (South Africa's Protection of Personal Information Act) grants data
+// subjects a right to request erasure — but a FICA-regulated investment
+// platform has its own statutory obligation to retain KYC/AML/transaction
+// records for a fixed retention period, so a request here can't just mean
+// "immediately delete everything." This is a request an admin reviews and
+// actions manually (what "deletion" actually means in practice — anonymizing
+// non-regulatory fields vs. a hard delete once retention lapses — is a
+// compliance-team decision, not something this table automates), not a
+// self-service action.
+export const dataDeletionRequests = pgTable("data_deletion_requests", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => profiles.id, { onDelete: "cascade" }),
+  reason: text("reason"),
+  status: dataDeletionRequestStatusEnum("status").notNull().default("pending"),
+  reviewedBy: text("reviewed_by").references(() => profiles.id),
+  reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+  reviewerNotes: text("reviewer_notes"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
 
 export const investmentOfferings = pgTable("investment_offerings", {
   id: uuid("id").primaryKey().defaultRandom(),
