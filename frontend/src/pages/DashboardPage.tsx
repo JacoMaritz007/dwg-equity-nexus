@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { api } from '@/lib/api-client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { VerificationStatusCard } from '@/components/verification/VerificationStatusCard';
+import { useVerificationStatus } from '@/hooks/useVerificationStatus';
 import { 
   TrendingUp, 
   DollarSign, 
@@ -102,58 +102,7 @@ const upcomingOpportunities = [
 
 export const DashboardPage: React.FC = () => {
   const { user } = useAuth();
-  const [verificationData, setVerificationData] = useState({
-    overallProgress: 0,
-    identityVerified: false,
-    addressVerified: false,
-    financialVerified: false,
-    kycCompleted: false,
-  });
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetchVerificationStatus();
-  }, [user]);
-
-  const fetchVerificationStatus = async () => {
-    if (!user) return;
-
-    try {
-      const profile = await api.get<{
-        isAccredited: boolean | null;
-        kycVerified: boolean | null;
-        verificationStatus: string | null;
-      }>(`/profiles/${user.id}`);
-
-      // Calculate verification status based on existing data
-      const identityVerified = profile?.verificationStatus === 'approved';
-      const addressVerified = profile?.verificationStatus === 'approved';
-      const financialVerified = profile?.verificationStatus === 'approved' && Boolean(profile?.isAccredited);
-      const kycCompleted = profile?.kycVerified || false;
-
-      const verifications = [
-        identityVerified,
-        addressVerified,
-        financialVerified,
-        kycCompleted
-      ];
-      
-      const completedCount = verifications.filter(Boolean).length;
-      const overallProgress = Math.round((completedCount / verifications.length) * 100);
-
-      setVerificationData({
-        overallProgress,
-        identityVerified,
-        addressVerified,
-        financialVerified,
-        kycCompleted,
-      });
-    } catch (error) {
-      console.error('Error fetching verification status:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { status: verificationStatus, loading } = useVerificationStatus();
 
   return (
     <div className="container mx-auto p-6 space-y-8">
@@ -298,14 +247,14 @@ export const DashboardPage: React.FC = () => {
       </div>
 
       {/* Account Verification Status */}
-      {!loading && (
+      {!loading && verificationStatus && (
         <VerificationStatusCard
-          overallProgress={verificationData.overallProgress}
-          identityVerified={verificationData.identityVerified}
-          addressVerified={verificationData.addressVerified}
-          financialVerified={verificationData.financialVerified}
-          kycCompleted={verificationData.kycCompleted}
-          isAccredited={user?.isAccredited || false}
+          overallProgress={verificationStatus.overall_progress}
+          identityVerified={verificationStatus.identity_verified}
+          addressVerified={verificationStatus.address_verified}
+          financialVerified={verificationStatus.financial_verified}
+          kycCompleted={verificationStatus.kyc_completed}
+          isAccredited={verificationStatus.is_accredited}
         />
       )}
     </div>
