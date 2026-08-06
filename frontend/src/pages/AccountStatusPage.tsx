@@ -14,8 +14,7 @@ import {
   CreditCard, 
   Shield, 
   FileText,
-  Eye,
-  ExternalLink
+  Eye
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { DocumentUploadModal } from '@/components/documents/DocumentUploadModal';
@@ -295,15 +294,9 @@ export const AccountStatusPage: React.FC = () => {
           icon={<Clock className="h-5 w-5" />}
           action={
             verificationStatus?.investor_classification ? (
-              <div className="space-y-2">
-                <Badge variant="outline" className="w-full justify-center">
-                  {verificationStatus.investor_classification}
-                </Badge>
-                <Button size="sm" variant="ghost" className="w-full">
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  Update Classification
-                </Button>
-              </div>
+              <Badge variant="outline" className="w-full justify-center py-1.5">
+                {verificationStatus.investor_classification}
+              </Badge>
             ) : (
               <Button size="sm" variant="outline" className="w-full">
                 <FileText className="h-4 w-4 mr-2" />
