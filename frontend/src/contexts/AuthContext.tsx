@@ -123,7 +123,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, password: string) => {
     setLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const credential = await signInWithEmailAndPassword(auth, email, password);
+      // Wait for the profile fetch before navigating — previously this
+      // navigated to /dashboard as soon as Firebase accepted the password,
+      // while the profile load ran separately in the onAuthStateChanged
+      // listener. If that later failed, it only logged to the console and
+      // ProtectedRoute silently bounced back to /auth with no error shown
+      // anywhere. Mirrors what register() already does below.
+      await loadUser(credential.user);
       navigate("/dashboard");
     } finally {
       setLoading(false);
