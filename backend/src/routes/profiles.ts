@@ -2,8 +2,21 @@ import type { FastifyPluginAsync } from "fastify";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db/client.js";
-import { profiles, userRoles, sourceOfWealthEnum } from "../db/schema.js";
-import { canViewProfile, assertCanUpdateProfile, assertAdmin, AuthzError } from "../authz/policies.js";
+import {
+  profiles,
+  userRoles,
+  sourceOfWealthEnum,
+  dataDeletionRequests,
+  userInvestments,
+  verificationDocuments,
+} from "../db/schema.js";
+import {
+  canViewProfile,
+  assertCanUpdateProfile,
+  assertCanRequestDataDeletion,
+  assertAdmin,
+  AuthzError,
+} from "../authz/policies.js";
 
 const bootstrapSchema = z.object({
   firstName: z.string().min(1),
@@ -17,12 +30,22 @@ const bootstrapSchema = z.object({
   phone: z.string().optional(),
 });
 
+// Deliberately does NOT include occupation/nationality/employer/sourceOfWealth/
+// isPep — those are AML compliance data, only ever settable through the
+// amlQuestionnaireSchema route below (its own "I certify this is accurate"
+// declaration step). Letting this general-purpose contact-info PATCH silently
+// edit them would undermine that declaration's integrity.
 const updateProfileSchema = bootstrapSchema.partial().extend({
   address: z.string().optional(),
   city: z.string().optional(),
   state: z.string().optional(),
   zipCode: z.string().optional(),
+  country: z.string().optional(),
   dateOfBirth: z.string().optional(),
+  notifyNewOfferings: z.boolean().optional(),
+  notifyCapitalCalls: z.boolean().optional(),
+  notifyDocumentUpdates: z.boolean().optional(),
+  notifyMarketing: z.boolean().optional(),
 });
 
 // FICA (South Africa's Financial Intelligence Centre Act) CDD self-declaration.
@@ -172,6 +195,87 @@ const profilesRoutes: FastifyPluginAsync = async (fastify) => {
     }
     reply.send(updated);
   });
+
+  // POPIA data portability — a bundle of the caller's own records, not raw
+  // uploaded files (those are already independently accessible via their own
+  // signed-URL endpoints). Self-or-admin, matching canViewProfile.
+  fastify.get<{ Params: { id: string } }>("/profiles/:id/export", async (request, reply) => {
+    const { id } = request.params;
+    if (!canViewProfile(request.actor, id)) {
+      reply.code(403).send({ error: "Forbidden" });
+      return;
+    }
+    const [profile, investments, verificationDocs] = await Promise.all([
+      db.query.profiles.findFirst({ where: eq(profiles.id, id) }),
+      db.query.userInvestments.findMany({ where: eq(userInvestments.userId, id) }),
+      db.query.verificationDocuments.findMany({ where: eq(verificationDocuments.userId, id) }),
+    ]);
+    if (!profile) {
+      reply.code(404).send({ error: "Not found" });
+      return;
+    }
+    reply.send({
+      exportedAt: new Date().toISOString(),
+      profile,
+      investments,
+      verificationDocuments: verificationDocs.map((d) => ({
+        id: d.id,
+        documentType: d.documentType,
+        fileName: d.fileName,
+        verificationStatus: d.verificationStatus,
+        createdAt: d.createdAt,
+      })),
+    });
+  });
+
+  // POPIA erasure request — creates a record for compliance to review, never
+  // deletes anything itself. See the schema comment on dataDeletionRequests
+  // for why: FICA's own retention obligations mean "delete my data" can't be
+  // fulfilled as an instant self-service action on a regulated platform.
+  fastify.post<{ Params: { id: string } }>("/profiles/:id/deletion-request", async (request, reply) => {
+    const { id } = request.params;
+    assertCanRequestDataDeletion(request.actor, id);
+    const body = z.object({ reason: z.string().optional() }).parse(request.body);
+
+    const [created] = await db
+      .insert(dataDeletionRequests)
+      .values({ userId: id, reason: body.reason })
+      .returning();
+    reply.code(201).send(created);
+  });
+
+  fastify.get("/data-deletion-requests", async (request, reply) => {
+    assertAdmin(request.actor);
+    const all = await db.query.dataDeletionRequests.findMany();
+    reply.send(all);
+  });
+
+  fastify.post<{ Params: { id: string } }>(
+    "/data-deletion-requests/:id/review",
+    async (request, reply) => {
+      assertAdmin(request.actor);
+      const body = z
+        .object({ status: z.enum(["approved", "denied"]), reviewerNotes: z.string().optional() })
+        .parse(request.body);
+
+      const [updated] = await db
+        .update(dataDeletionRequests)
+        .set({
+          status: body.status,
+          reviewerNotes: body.reviewerNotes,
+          reviewedBy: request.actor.uid,
+          reviewedAt: new Date(),
+        })
+        .where(eq(dataDeletionRequests.id, request.params.id))
+        .returning();
+
+      if (!updated) {
+        reply.code(404).send({ error: "Not found" });
+        return;
+      }
+      reply.send(updated);
+    },
+  );
 
   fastify.get("/me", async (request, reply) => {
     const profile = await db.query.profiles.findFirst({
