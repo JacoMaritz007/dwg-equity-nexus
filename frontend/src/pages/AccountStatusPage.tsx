@@ -14,7 +14,8 @@ import {
   CreditCard, 
   Shield, 
   FileText,
-  Eye
+  Eye,
+  Award
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { DocumentUploadModal } from '@/components/documents/DocumentUploadModal';
@@ -99,9 +100,9 @@ export const AccountStatusPage: React.FC = () => {
   const { status: verificationStatus, loading, refetch } = useVerificationStatus();
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [amlModalOpen, setAmlModalOpen] = useState(false);
-  const [selectedDocumentCategory, setSelectedDocumentCategory] = useState<'identity' | 'address' | 'financial' | undefined>();
+  const [selectedDocumentCategory, setSelectedDocumentCategory] = useState<'identity' | 'address' | 'financial' | 'accreditation' | undefined>();
 
-  const handleUploadClick = (category: 'identity' | 'address' | 'financial') => {
+  const handleUploadClick = (category: 'identity' | 'address' | 'financial' | 'accreditation') => {
     setSelectedDocumentCategory(category);
     setUploadModalOpen(true);
   };
@@ -301,6 +302,31 @@ export const AccountStatusPage: React.FC = () => {
               <Button size="sm" variant="outline" className="w-full">
                 <FileText className="h-4 w-4 mr-2" />
                 Complete Assessment
+              </Button>
+            )
+          }
+        />
+
+        {/* Accredited Investor Status */}
+        <VerificationCard
+          title="Accredited Investor Status"
+          description="Sophisticated/high-net-worth investor certification"
+          status={verificationStatus?.is_accredited ? 'verified' : 'required'}
+          icon={<Award className="h-5 w-5" />}
+          action={
+            verificationStatus?.is_accredited ? (
+              <Badge variant="outline" className="w-full justify-center py-1.5">
+                Accredited
+              </Badge>
+            ) : (
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-full"
+                onClick={() => handleUploadClick('accreditation')}
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Submit Accreditation Documents
               </Button>
             )
           }

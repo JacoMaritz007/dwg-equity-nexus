@@ -13,7 +13,7 @@ import { Upload, X, FileText, CheckCircle } from 'lucide-react';
 
 interface DocumentUploaderProps {
   onSuccess?: () => void;
-  preselectedCategory?: 'identity' | 'address' | 'financial';
+  preselectedCategory?: 'identity' | 'address' | 'financial' | 'accreditation';
   allowedDocumentTypes?: string[];
 }
 

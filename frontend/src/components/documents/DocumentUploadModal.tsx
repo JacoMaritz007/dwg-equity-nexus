@@ -11,7 +11,7 @@ import { DocumentUploader } from './DocumentUploader';
 export interface DocumentUploadModalProps {
   isOpen: boolean;
   onClose: () => void;
-  documentCategory?: 'identity' | 'address' | 'financial';
+  documentCategory?: 'identity' | 'address' | 'financial' | 'accreditation';
   onSuccess?: () => void;
 }
 
@@ -57,6 +57,18 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
             'Income verification or payslips',
             'Source of wealth documentation',
             'Professional qualifications (if applicable)'
+          ]
+        };
+      case 'accreditation':
+        return {
+          title: 'Submit Accreditation Documents',
+          description: 'Upload evidence of sophisticated/accredited investor status to unlock premium opportunities.',
+          acceptedTypes: ['sophisticated_investor_cert', 'professional_qualification'],
+          guidelines: [
+            'A sophisticated investor certificate, or',
+            'Evidence of a relevant professional qualification',
+            'Document must be clear and readable',
+            'Reviewed by our compliance team before your status updates'
           ]
         };
       default:
