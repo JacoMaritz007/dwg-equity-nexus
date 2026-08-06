@@ -16,6 +16,7 @@
 // src/authz/policies.ts as real code, enforced by the API layer — see that
 // file for the mapping from each old policy to its new equivalent.
 
+import { sql } from "drizzle-orm";
 import {
   pgTable,
   pgEnum,
@@ -28,6 +29,7 @@ import {
   bigint,
   integer,
   unique,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 // ---------------------------------------------------------------------------
@@ -314,7 +316,15 @@ export const userInvestments = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [unique().on(t.userId, t.offeringId)],
+  // Partial, not a plain unique() — a cancelled pledge must not permanently
+  // block the same investor from ever pledging to this offering again. Only
+  // one non-cancelled row per (user, offering) is enforced; any number of
+  // cancelled ones can coexist.
+  (t) => [
+    uniqueIndex("user_investments_user_id_offering_id_unique")
+      .on(t.userId, t.offeringId)
+      .where(sql`status <> 'cancelled'`),
+  ],
 );
 
 export const transactions = pgTable("transactions", {

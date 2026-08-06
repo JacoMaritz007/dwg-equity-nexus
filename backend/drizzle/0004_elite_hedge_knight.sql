@@ -1,0 +1,2 @@
+ALTER TABLE "user_investments" DROP CONSTRAINT "user_investments_user_id_offering_id_unique";--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "user_investments_user_id_offering_id_unique" ON "user_investments" USING btree ("user_id","offering_id") WHERE status <> 'cancelled';
