@@ -1,6 +1,6 @@
 // Plain TS types, field names kept snake_case to match every existing
 // consumer component (CreateOfferingForm, OfferingDetailsPage, MediaPreview,
-// InvestmentProcessModal, OfferingsManagement — none of which are migrated
+// PledgeWizard, OfferingsManagement — none of which are migrated
 // off Supabase yet; see frontend/README.md). Replaces the old dependency on
 // Supabase-generated `Database['public']['Tables'][...]` types, which no
 // longer have a source, without changing the shape those files expect.
