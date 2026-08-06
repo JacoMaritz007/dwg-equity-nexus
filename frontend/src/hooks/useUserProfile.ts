@@ -5,7 +5,7 @@ import { api } from '@/lib/api-client';
 // Field names are camelCase now (matches the API's JSON responses directly,
 // which come straight from Drizzle) — the old snake_case shape was just
 // Postgres's column naming leaking through the Supabase client.
-interface UserProfile {
+export interface UserProfile {
   id: string;
   kycVerified: boolean | null;
   identityVerified: boolean | null;
@@ -16,8 +16,19 @@ interface UserProfile {
   lastName?: string | null;
   email?: string | null;
   phone?: string | null;
+  address?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zipCode?: string | null;
+  country?: string | null;
+  dateOfBirth?: string | null;
   annualIncome?: string | null;
   netWorth?: string | null;
+  notifyNewOfferings?: boolean;
+  notifyCapitalCalls?: boolean;
+  notifyDocumentUpdates?: boolean;
+  notifyMarketing?: boolean;
+  createdAt?: string;
 }
 
 export const useUserProfile = () => {
