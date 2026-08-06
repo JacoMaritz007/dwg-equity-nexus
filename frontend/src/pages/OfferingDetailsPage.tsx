@@ -23,7 +23,7 @@ import { InvestmentOfferingWithDetails } from '@/types/investment';
 import { transformOfferingForDisplay, getStatusColor, formatCurrency } from '@/utils/offeringHelpers';
 import { useVerificationStatus } from '@/hooks/useVerificationStatus';
 import { Navigation } from '@/components/layout/Navigation';
-import { InvestmentProcessModal } from '@/components/investment/InvestmentProcessModal';
+import { PledgeWizard } from '@/components/pledge/PledgeWizard';
 import { toast } from 'sonner';
 import { useDocuments } from '@/hooks/useDocuments';
 
@@ -62,7 +62,7 @@ export const OfferingDetailsPage: React.FC = () => {
 
   // Check if user wants to start investment process
   useEffect(() => {
-    if (searchParams.get('action') === 'invest' && offering) {
+    if (searchParams.get('action') === 'pledge' && offering) {
       setShowInvestmentModal(true);
     }
   }, [searchParams, offering]);
@@ -257,17 +257,18 @@ export const OfferingDetailsPage: React.FC = () => {
                   className="w-full financial-button"
                   onClick={() => {
                     if (!verificationStatus?.can_invest) {
-                      toast.error('Please complete verification before investing');
+                      toast.error('Please complete verification before pledging');
                       window.location.href = '/account-status';
                       return;
                     }
                     setShowInvestmentModal(true);
                   }}
                 >
-                  {verificationStatus?.can_invest ? 'Invest Now' : 'Complete Verification to Invest'}
+                  {verificationStatus?.can_invest ? 'Commit Capital' : 'Complete Verification to Pledge'}
                 </Button>
                 <p className="text-xs text-muted-foreground text-center">
-                  By investing, you agree to our terms and conditions
+                  You're not transferring funds today — you're making a binding commitment to invest
+                  when capital is called
                 </p>
               </div>
             )}
@@ -497,9 +498,9 @@ export const OfferingDetailsPage: React.FC = () => {
           </TabsContent>
         </Tabs>
 
-        {/* Investment Process Modal */}
+        {/* Pledge Wizard */}
         {offering && (
-          <InvestmentProcessModal
+          <PledgeWizard
             offering={offering}
             isOpen={showInvestmentModal}
             onClose={() => setShowInvestmentModal(false)}

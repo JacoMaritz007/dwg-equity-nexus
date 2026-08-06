@@ -182,22 +182,22 @@ export const InvestPage: React.FC = () => {
               className="flex-1 financial-button"
               onClick={() => {
                 if (!verificationStatus?.can_invest) {
-                  toast.error('Please complete verification before investing');
+                  toast.error('Please complete verification before pledging');
                   window.location.href = '/account-status';
                   return;
                 }
-                window.location.href = `/invest/offerings/${offering.id}?action=invest`;
+                window.location.href = `/invest/offerings/${offering.id}?action=pledge`;
               }}
             >
               {verificationStatus?.can_invest ? (
                 <>
-                  Invest Now
+                  Pledge Now
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </>
               ) : (
                 <>
                   <AlertTriangle className="mr-2 h-4 w-4" />
-                  Verify to Invest
+                  Verify to Pledge
                 </>
               )}
             </Button>
