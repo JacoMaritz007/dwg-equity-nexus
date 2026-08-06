@@ -1,5 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db/client.js";
 import {
@@ -97,24 +97,68 @@ async function withSignedMediaUrls<T extends { mediaType: string; filePath: stri
   );
 }
 
+// Signed-but-unpaid capital is deliberately excluded — same "never overstate
+// what hasn't actually moved" principle as raisedAmount (see
+// capital-call-draws.ts). Pledged is one step earlier than raised: a
+// committed, signed subscription that hasn't necessarily been called yet.
+// Excludes 'pending_signature' (draft, not yet legally binding) and
+// 'cancelled', plus the pre-pledge-wizard legacy 'pending' status (never
+// carries a fee snapshot or signature, so it isn't a real pledge either).
+const PLEDGED_STATUSES = ["pledged", "partially_called", "fully_called"] as const;
+
+interface PledgeTotals {
+  pledgedAmount: string;
+  pledgerCount: number;
+}
+
+// One grouped query for however many offering ids are asked for, instead of
+// a per-offering round trip — same list-page cost whether it's showing 1
+// card or 50.
+async function getPledgeTotals(offeringIds: string[]): Promise<Map<string, PledgeTotals>> {
+  if (offeringIds.length === 0) return new Map();
+  const rows = await db
+    .select({
+      offeringId: userInvestments.offeringId,
+      pledgedAmount: sql<string>`coalesce(sum(${userInvestments.investmentAmount}), 0)`,
+      pledgerCount: sql<number>`count(distinct ${userInvestments.userId})`,
+    })
+    .from(userInvestments)
+    .where(
+      and(
+        inArray(userInvestments.offeringId, offeringIds),
+        inArray(userInvestments.status, [...PLEDGED_STATUSES]),
+      ),
+    )
+    .groupBy(userInvestments.offeringId);
+  return new Map(rows.map((r) => [r.offeringId, { pledgedAmount: r.pledgedAmount, pledgerCount: Number(r.pledgerCount) }]));
+}
+
 const offeringsRoutes: FastifyPluginAsync = async (fastify) => {
   // "Authenticated users can view active offerings" / admin sees all,
   // including drafts. Auth itself is already enforced by the global
   // onRequest hook, so any request that got this far is authenticated.
   //
-  // Embeds media (with signed URLs) on every offering, matching the
-  // original Supabase app's single joined query — offering cards need the
-  // featured image without a second round-trip per card.
+  // Embeds media (with signed URLs) and pledge totals on every offering,
+  // matching the original Supabase app's single joined query — offering
+  // cards need the featured image and pledge momentum without a
+  // second round-trip per card.
   fastify.get("/offerings", async (request, reply) => {
     const all = await db.query.investmentOfferings.findMany();
     const visible = all.filter((o) => canViewOffering(request.actor, o.status ?? "draft"));
+    const pledgeTotals = await getPledgeTotals(visible.map((o) => o.id));
 
     const withMedia = await Promise.all(
       visible.map(async (o) => {
         const media = await db.query.offeringMedia.findMany({
           where: eq(offeringMedia.offeringId, o.id),
         });
-        return { ...o, offeringMedia: await withSignedMediaUrls(media) };
+        const totals = pledgeTotals.get(o.id);
+        return {
+          ...o,
+          offeringMedia: await withSignedMediaUrls(media),
+          pledgedAmount: totals?.pledgedAmount ?? "0",
+          pledgerCount: totals?.pledgerCount ?? 0,
+        };
       }),
     );
 
@@ -133,7 +177,12 @@ const offeringsRoutes: FastifyPluginAsync = async (fastify) => {
       reply.code(403).send({ error: "Forbidden" });
       return;
     }
-    reply.send(offering);
+    const totals = (await getPledgeTotals([offering.id])).get(offering.id);
+    reply.send({
+      ...offering,
+      pledgedAmount: totals?.pledgedAmount ?? "0",
+      pledgerCount: totals?.pledgerCount ?? 0,
+    });
   });
 
   // Count of investors in an offering. In the original Supabase app this
