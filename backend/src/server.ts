@@ -10,6 +10,7 @@ import documentsRoutes from "./routes/documents.js";
 import verificationRoutes from "./routes/verification.js";
 import complianceRoutes from "./routes/compliance.js";
 import offeringExtrasRoutes from "./routes/offering-extras.js";
+import capitalCallDrawsRoutes from "./routes/capital-call-draws.js";
 import storageRoutes from "./routes/storage.js";
 import adminRoutes from "./routes/admin.js";
 
@@ -31,6 +32,7 @@ await fastify.register(documentsRoutes);
 await fastify.register(verificationRoutes);
 await fastify.register(complianceRoutes);
 await fastify.register(offeringExtrasRoutes);
+await fastify.register(capitalCallDrawsRoutes);
 await fastify.register(storageRoutes);
 await fastify.register(adminRoutes);
 
