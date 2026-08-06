@@ -25,6 +25,8 @@ function mapOffering(o: Record<string, unknown>): InvestmentOffering {
     description: (o.description as string) ?? null,
     target_amount: Number(o.targetAmount),
     raised_amount: num(o.raisedAmount),
+    pledged_amount: num(o.pledgedAmount),
+    pledger_count: num(o.pledgerCount),
     minimum_investment: Number(o.minimumInvestment),
     maximum_investment: num(o.maximumInvestment),
     investment_type: o.investmentType as string,

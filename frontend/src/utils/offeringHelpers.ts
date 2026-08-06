@@ -20,9 +20,14 @@ export const getStorageUrl = (filePath: string): string => {
 };
 
 export const transformOfferingForDisplay = (offering: InvestmentOfferingWithDetails): OfferingDisplayData => {
-  // Calculate raised percentage
-  const raisedPercentage = offering.target_amount 
+  // Calculate raised/pledged percentages. Pledged is always >= raised (it's
+  // signed commitments, a superset of what's actually been called and
+  // paid — see backend/src/routes/offerings.ts's PLEDGED_STATUSES comment).
+  const raisedPercentage = offering.target_amount
     ? Math.min(((offering.raised_amount || 0) / offering.target_amount) * 100, 100)
+    : 0;
+  const pledgedPercentage = offering.target_amount
+    ? Math.min(((offering.pledged_amount || 0) / offering.target_amount) * 100, 100)
     : 0;
 
   // Get primary image from media - check for featured_image type first
@@ -86,6 +91,9 @@ export const transformOfferingForDisplay = (offering: InvestmentOfferingWithDeta
     status: displayStatus,
     raisedAmount: offering.raised_amount || 0,
     raisedPercentage,
+    pledgedAmount: offering.pledged_amount || 0,
+    pledgedPercentage,
+    pledgerCount: offering.pledger_count || 0,
     closingDate: offering.closing_date || '',
     highlights,
     description: offering.description || '',

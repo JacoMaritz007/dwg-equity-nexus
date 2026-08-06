@@ -18,6 +18,8 @@ export interface InvestmentOffering {
   description: string | null;
   target_amount: number;
   raised_amount: number | null;
+  pledged_amount: number | null;
+  pledger_count: number | null;
   minimum_investment: number;
   maximum_investment: number | null;
   investment_type: string;
@@ -133,6 +135,9 @@ export interface OfferingDisplayData {
   status: 'active' | 'past' | 'coming-soon';
   raisedAmount: number;
   raisedPercentage: number;
+  pledgedAmount: number;
+  pledgedPercentage: number;
+  pledgerCount: number;
   closingDate: string;
   highlights: string[];
   description?: string;
