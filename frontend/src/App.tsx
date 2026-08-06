@@ -22,6 +22,8 @@ import EditOffering from "@/pages/admin/EditOffering";
 import UserManagement from "@/pages/admin/UserManagement";
 import AdminDocuments from "@/pages/admin/AdminDocuments";
 import AdminCompliance from "@/pages/admin/AdminCompliance";
+import CapitalCallsManagement from "@/pages/admin/CapitalCallsManagement";
+import CreateCapitalCall from "@/pages/admin/CreateCapitalCall";
 import { OfferingDetailsPage } from "@/pages/OfferingDetailsPage";
 
 const queryClient = new QueryClient();
@@ -221,6 +223,24 @@ const App = () => (
                   <AuthorizedRoute requiredRole="admin">
                     <Navigation />
                     <AdminCompliance />
+                  </AuthorizedRoute>
+                }
+              />
+              <Route
+                path="/admin/capital-calls"
+                element={
+                  <AuthorizedRoute requiredRole="admin">
+                    <Navigation />
+                    <CapitalCallsManagement />
+                  </AuthorizedRoute>
+                }
+              />
+              <Route
+                path="/admin/capital-calls/create"
+                element={
+                  <AuthorizedRoute requiredRole="admin">
+                    <Navigation />
+                    <CreateCapitalCall />
                   </AuthorizedRoute>
                 }
               />
