@@ -134,10 +134,19 @@ const verificationRoutes: FastifyPluginAsync = async (fastify) => {
       if (body.status === "approved") {
         const identityTypes = ["passport", "national_id", "driving_license"];
         const financialTypes = ["bank_statement", "income_verification", "source_of_wealth"];
+        // Sophisticated-investor / professional-qualification uploads were
+        // acceptable document types for the "financial" upload category
+        // (see DocumentUploadModal.tsx) and had display labels in the
+        // uploader, but approving one never actually did anything —
+        // profiles.isAccredited had no route setting it anywhere, so the
+        // "Accredited Investor Status" badge was permanently stuck on
+        // Pending for every user regardless of what they submitted.
+        const accreditationTypes = ["sophisticated_investor_cert", "professional_qualification"];
         const flagUpdates: Partial<typeof profiles.$inferInsert> = {};
         if (identityTypes.includes(doc.documentType)) flagUpdates.identityVerified = true;
         else if (doc.documentType === "proof_of_address") flagUpdates.addressVerified = true;
         else if (financialTypes.includes(doc.documentType)) flagUpdates.financialVerified = true;
+        else if (accreditationTypes.includes(doc.documentType)) flagUpdates.isAccredited = true;
 
         if (Object.keys(flagUpdates).length > 0) {
           await db

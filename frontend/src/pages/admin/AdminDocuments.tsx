@@ -165,6 +165,8 @@ const AdminDocuments: React.FC = () => {
       case 'bank_statement': return 'Bank Statement';
       case 'income_verification': return 'Income Verification';
       case 'source_of_wealth': return 'Source of Wealth';
+      case 'sophisticated_investor_cert': return 'Sophisticated Investor Certificate';
+      case 'professional_qualification': return 'Professional Qualification';
       default: return type;
     }
   };
@@ -284,6 +286,8 @@ const AdminDocuments: React.FC = () => {
                 <SelectItem value="bank_statement">Bank Statement</SelectItem>
                 <SelectItem value="income_verification">Income Verification</SelectItem>
                 <SelectItem value="source_of_wealth">Source of Wealth</SelectItem>
+                <SelectItem value="sophisticated_investor_cert">Sophisticated Investor Certificate</SelectItem>
+                <SelectItem value="professional_qualification">Professional Qualification</SelectItem>
               </SelectContent>
             </Select>
           </div>
