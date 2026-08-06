@@ -59,6 +59,20 @@ export const capitalCallStatusEnum = pgEnum("capital_call_status", [
   "completed",
   "overdue",
 ]);
+export const pledgeEntityTypeEnum = pgEnum("pledge_entity_type", [
+  "individual",
+  "trust",
+  "corporate",
+]);
+// Fulfillment state of one investor's obligation against one capital call —
+// distinct from capitalCallStatusEnum above, which describes the call itself,
+// not any individual investor's payment against it.
+export const capitalCallDrawStatusEnum = pgEnum("capital_call_draw_status", [
+  "due",
+  "payment_submitted",
+  "confirmed",
+  "waived",
+]);
 export const verificationStatusEnum = pgEnum("verification_status", [
   "pending",
   "in_progress",
@@ -230,7 +244,34 @@ export const userInvestments = pgTable(
     investmentAmount: numeric("investment_amount", { precision: 15, scale: 2 }).notNull(),
     shares: numeric("shares", { precision: 15, scale: 2 }),
     investmentDate: timestamp("investment_date", { withTimezone: true }).notNull().defaultNow(),
-    status: text("status").default("active"),
+    // Plain text, deliberately not a Postgres enum — existing rows hold
+    // 'active'/'pending' values a strict enum migration couldn't validate
+    // against without a hand-written data migration. Enforced via Zod in
+    // investments.ts instead. Contract as of the pledging feature:
+    // 'pending_signature' | 'pledged' | 'partially_called' | 'fully_called' | 'cancelled'.
+    status: text("status").default("pending_signature"),
+
+    // --- Pledge: who is committing ---------------------------------------
+    entityType: pledgeEntityTypeEnum("entity_type").notNull().default("individual"),
+    entityLegalName: text("entity_legal_name"),
+    entityRegistrationNumber: text("entity_registration_number"),
+
+    // --- Pledge: suitability & risk acknowledgment (FICA CDD-adjacent) ---
+    riskAcknowledged: boolean("risk_acknowledged").notNull().default(false),
+    concentrationLimitConfirmed: boolean("concentration_limit_confirmed").notNull().default(false),
+    suitabilityAcknowledgedAt: timestamp("suitability_acknowledged_at", { withTimezone: true }),
+
+    // --- Pledge: e-signature audit trail ----------------------------------
+    signerLegalName: text("signer_legal_name"),
+    signedAt: timestamp("signed_at", { withTimezone: true }),
+    signerIpAddress: text("signer_ip_address"),
+    agreementVersion: text("agreement_version"),
+    agreementDocumentHash: text("agreement_document_hash"),
+
+    // --- Pledge: fee snapshot at signature time ---------------------------
+    platformFeeAmount: numeric("platform_fee_amount", { precision: 15, scale: 2 }),
+    totalExpectedCallAmount: numeric("total_expected_call_amount", { precision: 15, scale: 2 }),
+
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -302,6 +343,42 @@ export const capitalCalls = pgTable("capital_calls", {
     .references(() => profiles.id),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// Per-investor fulfillment ledger for a capital call — capitalCalls above
+// only holds the call's display terms (title/amountPerShare/dueDate), it
+// never tracked who owes what or who's paid. Drawn as a percentage of each
+// investor's pledged investmentAmount (see /capital-calls/:id/issue-draws),
+// not amountPerShare — that field (and userInvestments.shares) are unused
+// everywhere in the frontend, so nothing real to multiply a per-share
+// amount against. Two-step confirm pattern (submit-payment then
+// confirm-payment), matching compliance.ts's initiate/confirm-upload split
+// for the same reason: don't mark a draw fulfilled before an admin has
+// actually verified the payment arrived.
+export const capitalCallDraws = pgTable(
+  "capital_call_draws",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    capitalCallId: uuid("capital_call_id")
+      .notNull()
+      .references(() => capitalCalls.id, { onDelete: "cascade" }),
+    investmentId: uuid("investment_id")
+      .notNull()
+      .references(() => userInvestments.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    amountDue: numeric("amount_due", { precision: 15, scale: 2 }).notNull(),
+    amountPaid: numeric("amount_paid", { precision: 15, scale: 2 }).default("0"),
+    status: capitalCallDrawStatusEnum("status").notNull().default("due"),
+    paymentReference: text("payment_reference"),
+    paymentSubmittedAt: timestamp("payment_submitted_at", { withTimezone: true }),
+    confirmedBy: text("confirmed_by").references(() => profiles.id),
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [unique().on(t.capitalCallId, t.investmentId)],
+);
 
 export const offeringMilestones = pgTable("offering_milestones", {
   id: uuid("id").primaryKey().defaultRandom(),
