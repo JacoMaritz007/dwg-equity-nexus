@@ -76,12 +76,18 @@ export const useTransactions = () => {
 
   const fetchAccountSummary = async () => {
     try {
-      const [investments, txRaw] = await Promise.all([
-        api.get<{ investmentAmount: string }[]>('/investments'),
+      const [investments, txRaw, drawsRaw] = await Promise.all([
+        api.get<{ investmentAmount: string; status: string }[]>('/investments'),
         api.get<{ type: string; amount: string }[]>('/transactions'),
+        api.get<{ amountDue: string; status: string }[]>('/capital-call-draws'),
       ]);
 
-      const totalInvestments = investments.reduce((sum, inv) => sum + Number(inv.investmentAmount), 0);
+      // Cancelled pledges never became real commitments — excluding them
+      // keeps this in line with the Capital Committed/Deployed split shown
+      // on MyInvestmentsPage (useMyInvestments.ts).
+      const totalInvestments = investments
+        .filter((inv) => inv.status !== 'cancelled')
+        .reduce((sum, inv) => sum + Number(inv.investmentAmount), 0);
 
       const contributions = txRaw
         .filter((t) => t.type === 'contribution')
@@ -93,9 +99,12 @@ export const useTransactions = () => {
 
       const pendingDistributions = 0; // Will be implemented with new schema
 
-      const capitalCalls = txRaw
-        .filter((t) => t.type === 'fee')
-        .reduce((sum, t) => sum + Number(t.amount), 0);
+      // Was filtering transactions by type === 'fee' — unrelated to actual
+      // capital calls, just a mislabeled stat. Real capital-call obligations
+      // live in capital_call_draws (see backend/src/routes/capital-call-draws.ts).
+      const capitalCalls = drawsRaw
+        .filter((d) => d.status === 'due' || d.status === 'payment_submitted')
+        .reduce((sum, d) => sum + Number(d.amountDue), 0);
 
       setAccountSummary({
         cashAvailable: contributions - totalInvestments + distributions,
