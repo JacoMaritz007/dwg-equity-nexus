@@ -29,7 +29,16 @@ const complianceRoutes: FastifyPluginAsync = async (fastify) => {
         expiryDate: z.string().optional(),
         fileName: z.string(),
         fileSize: z.number(),
-        mimeType: z.enum(["application/pdf", "image/jpeg", "image/png", "image/jpg"]),
+        // Matches what the admin UI's file picker actually accepts
+        // (accept=".pdf,image/*", validated client-side as startsWith('image/')
+        // || === 'application/pdf') — the previous hardcoded 4-value enum
+        // rejected anything outside exactly jpeg/png/jpg/pdf (e.g. image/heic,
+        // image/webp), 400ing before the signed-URL upload ever started.
+        mimeType: z
+          .string()
+          .refine((v) => v === "application/pdf" || v.startsWith("image/"), {
+            message: "File must be a PDF or an image",
+          }),
         notes: z.string().optional(),
       })
       .parse(request.body);
