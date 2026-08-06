@@ -109,6 +109,24 @@ export function canUpdateInvestment(actor: Actor, investmentUserId: string): boo
   return actor.uid === investmentUserId || isAdmin(actor);
 }
 
+// "Users can sign their own pledge" — the e-signature step on a pledge that
+// hasn't been signed yet; distinct from canUpdateInvestment since signing has
+// its own additional preconditions (status, KYC re-check) enforced in the route.
+export function assertCanSignPledge(actor: Actor, investmentUserId: string): void {
+  assert(actor.uid === investmentUserId, "Can only sign your own pledge");
+}
+
+// --- capital_call_draws -------------------------------------------------------
+export function canViewCapitalCallDraw(actor: Actor, drawUserId: string): boolean {
+  return actor.uid === drawUserId || isAdmin(actor);
+}
+export function assertCanSubmitDrawPayment(actor: Actor, drawUserId: string): void {
+  assert(actor.uid === drawUserId, "Can only submit payment for your own capital call");
+}
+export function assertCanConfirmDrawPayment(actor: Actor): void {
+  assertAdmin(actor);
+}
+
 // --- transactions ------------------------------------------------------------
 export function canViewTransaction(actor: Actor, transactionUserId: string): boolean {
   return actor.uid === transactionUserId || isAdmin(actor);
