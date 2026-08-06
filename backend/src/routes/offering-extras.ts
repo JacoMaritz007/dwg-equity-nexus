@@ -3,7 +3,7 @@
 // offerings.ts's milestones/media endpoints.
 
 import type { FastifyPluginAsync } from "fastify";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db/client.js";
 import { capitalCalls, investmentUpdates, userInvestments, investmentOfferings } from "../db/schema.js";
@@ -20,13 +20,13 @@ const offeringExtrasRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get<{ Params: { id: string } }>(
     "/offerings/:id/capital-calls",
     async (request, reply) => {
-      const hasInvestment = await db.query.userInvestments.findFirst({
-        where: eq(userInvestments.offeringId, request.params.id),
+      const ownInvestment = await db.query.userInvestments.findFirst({
+        where: and(
+          eq(userInvestments.offeringId, request.params.id),
+          eq(userInvestments.userId, request.actor.uid),
+        ),
       });
-      const ownsAnInvestment = Boolean(
-        hasInvestment && hasInvestment.userId === request.actor.uid,
-      );
-      if (!canViewCapitalCall(request.actor, ownsAnInvestment)) {
+      if (!canViewCapitalCall(request.actor, Boolean(ownInvestment))) {
         reply.code(403).send({ error: "Forbidden" });
         return;
       }
