@@ -44,6 +44,12 @@ export function canViewProfile(actor: Actor, targetUserId: string): boolean {
 export function assertCanUpdateProfile(actor: Actor, targetUserId: string): void {
   assert(actor.uid === targetUserId, "Can only update your own profile");
 }
+// Self-only, deliberately no admin bypass — an admin can review/action an
+// existing request, but shouldn't be able to unilaterally file a POPIA
+// erasure request on someone else's behalf.
+export function assertCanRequestDataDeletion(actor: Actor, targetUserId: string): void {
+  assert(actor.uid === targetUserId, "Can only request deletion of your own data");
+}
 
 // --- user_roles -----------------------------------------------------------
 // "Users can view their own roles" / admin sees all via a separate query
