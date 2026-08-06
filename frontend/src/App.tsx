@@ -24,7 +24,12 @@ import AdminDocuments from "@/pages/admin/AdminDocuments";
 import AdminCompliance from "@/pages/admin/AdminCompliance";
 import CapitalCallsManagement from "@/pages/admin/CapitalCallsManagement";
 import CreateCapitalCall from "@/pages/admin/CreateCapitalCall";
+import AdminDataRequests from "@/pages/admin/AdminDataRequests";
 import { OfferingDetailsPage } from "@/pages/OfferingDetailsPage";
+import { ProfilePage } from "@/pages/ProfilePage";
+import { AccountSettingsPage } from "@/pages/AccountSettingsPage";
+import { DataPrivacyPage } from "@/pages/DataPrivacyPage";
+import { EmailPreferencesPage } from "@/pages/EmailPreferencesPage";
 
 const queryClient = new QueryClient();
 
@@ -109,10 +114,7 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <Navigation />
-                    <div className="container mx-auto p-6">
-                      <h1 className="text-3xl font-bold">Profiles</h1>
-                      <p className="text-muted-foreground mt-2">Coming soon...</p>
-                    </div>
+                    <ProfilePage />
                   </ProtectedRoute>
                 }
               />
@@ -121,22 +123,16 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <Navigation />
-                    <div className="container mx-auto p-6">
-                      <h1 className="text-3xl font-bold">Account Settings</h1>
-                      <p className="text-muted-foreground mt-2">Coming soon...</p>
-                    </div>
+                    <AccountSettingsPage />
                   </ProtectedRoute>
                 }
               />
               <Route
-                path="/sharing"
+                path="/privacy"
                 element={
                   <ProtectedRoute>
                     <Navigation />
-                    <div className="container mx-auto p-6">
-                      <h1 className="text-3xl font-bold">Sharing</h1>
-                      <p className="text-muted-foreground mt-2">Coming soon...</p>
-                    </div>
+                    <DataPrivacyPage />
                   </ProtectedRoute>
                 }
               />
@@ -145,10 +141,7 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <Navigation />
-                    <div className="container mx-auto p-6">
-                      <h1 className="text-3xl font-bold">Email Preferences</h1>
-                      <p className="text-muted-foreground mt-2">Coming soon...</p>
-                    </div>
+                    <EmailPreferencesPage />
                   </ProtectedRoute>
                 }
               />
@@ -241,6 +234,15 @@ const App = () => (
                   <AuthorizedRoute requiredRole="admin">
                     <Navigation />
                     <CreateCapitalCall />
+                  </AuthorizedRoute>
+                }
+              />
+              <Route
+                path="/admin/data-requests"
+                element={
+                  <AuthorizedRoute requiredRole="admin">
+                    <Navigation />
+                    <AdminDataRequests />
                   </AuthorizedRoute>
                 }
               />

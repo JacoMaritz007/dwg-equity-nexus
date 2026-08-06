@@ -96,6 +96,13 @@ const AdminDashboard: React.FC = () => {
       href: "/admin/compliance",
       icon: Shield,
       variant: "outline" as const
+    },
+    {
+      title: "Data Requests",
+      description: "Review POPIA account-deletion requests",
+      href: "/admin/data-requests",
+      icon: AlertCircle,
+      variant: "outline" as const
     }
   ];
 

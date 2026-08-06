@@ -14,11 +14,11 @@ import {
   Bell, 
   CreditCard, 
   FileText, 
-  User, 
-  Settings, 
-  Share2, 
-  Mail, 
-  LogOut, 
+  User,
+  Settings,
+  Lock,
+  Mail,
+  LogOut,
   Menu,
   ChevronDown,
   Shield
@@ -34,10 +34,10 @@ const navigationItems = [
 ];
 
 const profileMenuItems = [
-  { href: '/profiles', label: 'Profiles', icon: User },
+  { href: '/profiles', label: 'My Profile', icon: User },
   { href: '/account-status', label: 'Account Status', icon: Shield },
   { href: '/account', label: 'Account Settings', icon: Settings },
-  { href: '/sharing', label: 'Sharing', icon: Share2 },
+  { href: '/privacy', label: 'Privacy & Data', icon: Lock },
   { href: '/email-preferences', label: 'Email Preferences', icon: Mail },
 ];
 
