@@ -21,8 +21,9 @@ import {
 } from 'lucide-react';
 import { useInvestmentOfferings } from '@/hooks/useInvestmentOfferings';
 import { useVerificationStatus } from '@/hooks/useVerificationStatus';
-import { transformOfferingForDisplay, formatCurrency } from '@/utils/offeringHelpers';
+import { transformOfferingForDisplay } from '@/utils/offeringHelpers';
 import { OfferingDisplayData } from '@/types/investment';
+import { PledgeProgressBar } from '@/components/pledge/PledgeProgressBar';
 import { toast } from 'sonner';
 
 
@@ -130,18 +131,13 @@ export const InvestPage: React.FC = () => {
 
         {/* Progress Bar (for active offerings) */}
         {offering.status === 'active' && (
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Raised: {formatCurrency(offering.raisedAmount)}</span>
-              <span className="font-medium">{offering.raisedPercentage}%</span>
-            </div>
-            <div className="w-full bg-muted rounded-full h-2">
-              <div 
-                className="bg-primary rounded-full h-2 transition-all duration-300"
-                style={{ width: `${offering.raisedPercentage}%` }}
-              />
-            </div>
-          </div>
+          <PledgeProgressBar
+            raisedAmount={offering.raisedAmount}
+            raisedPercentage={offering.raisedPercentage}
+            pledgedAmount={offering.pledgedAmount}
+            pledgedPercentage={offering.pledgedPercentage}
+            pledgerCount={offering.pledgerCount}
+          />
         )}
 
         {/* Closing Date */}

@@ -24,6 +24,7 @@ import { transformOfferingForDisplay, getStatusColor, formatCurrency } from '@/u
 import { useVerificationStatus } from '@/hooks/useVerificationStatus';
 import { Navigation } from '@/components/layout/Navigation';
 import { PledgeWizard } from '@/components/pledge/PledgeWizard';
+import { PledgeProgressBar } from '@/components/pledge/PledgeProgressBar';
 import { toast } from 'sonner';
 import { useDocuments } from '@/hooks/useDocuments';
 
@@ -228,23 +229,16 @@ export const OfferingDetailsPage: React.FC = () => {
             {/* Progress */}
             {offering.status === 'active' && (
               <Card>
-                <CardContent className="pt-4">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm font-medium">Funding Progress</span>
-                    <span className="text-sm text-muted-foreground">
-                      {displayData.raisedPercentage.toFixed(1)}%
-                    </span>
-                  </div>
-                  <div className="w-full bg-muted rounded-full h-3 mb-2">
-                    <div 
-                      className="bg-primary rounded-full h-3 transition-all duration-300"
-                      style={{ width: `${displayData.raisedPercentage}%` }}
-                    />
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="font-medium">{formatCurrency(displayData.raisedAmount)}</span>
-                    <span className="text-muted-foreground">raised</span>
-                  </div>
+                <CardContent className="pt-4 space-y-2">
+                  <span className="text-sm font-medium">Funding Progress</span>
+                  <PledgeProgressBar
+                    raisedAmount={displayData.raisedAmount}
+                    raisedPercentage={displayData.raisedPercentage}
+                    pledgedAmount={displayData.pledgedAmount}
+                    pledgedPercentage={displayData.pledgedPercentage}
+                    pledgerCount={displayData.pledgerCount}
+                    size="lg"
+                  />
                 </CardContent>
               </Card>
             )}
