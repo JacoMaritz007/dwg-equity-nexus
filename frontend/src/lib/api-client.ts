@@ -25,7 +25,12 @@ async function authHeader(): Promise<Record<string, string>> {
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = {
-    "Content-Type": "application/json",
+    // Only when there's an actual body — Fastify's default JSON body parser
+    // rejects a request that declares Content-Type: application/json but
+    // sends zero bytes (FST_ERR_CTP_EMPTY_JSON_BODY, surfaced as a 400
+    // before the route handler even runs), which is exactly what a
+    // no-arg api.post(path) call used to send.
+    ...(init.body ? { "Content-Type": "application/json" } : {}),
     ...(await authHeader()),
     ...init.headers,
   };
