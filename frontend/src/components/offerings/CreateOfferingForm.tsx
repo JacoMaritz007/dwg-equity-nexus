@@ -228,23 +228,23 @@ export const CreateOfferingForm: React.FC<CreateOfferingFormProps> = ({
   // offering (it decides the storage path — see
   // POST /offerings/:id/media/upload-url and /documents/upload-url in
   // backend/src/routes/offerings.ts and documents.ts), PUT the file
-  // directly to Cloud Storage, return the path for the DB row.
+  // directly to Cloud Storage, return the path for the DB row. Throws on
+  // failure (network issue, expired signed URL, bucket CORS block) rather
+  // than swallowing it — callers are responsible for surfacing the failure,
+  // since silently returning null here previously let the form report
+  // "updated successfully" while a file had actually never made it to
+  // storage or the database.
   const uploadFile = async (
     file: File,
     offeringId: string,
     kind: 'media' | 'document',
-  ): Promise<string | null> => {
-    try {
-      const { url, filePath } = await api.post<{ url: string; filePath: string }>(
-        `/offerings/${offeringId}/${kind === 'media' ? 'media' : 'documents'}/upload-url`,
-        { fileName: file.name, contentType: file.type },
-      );
-      await putFileToSignedUrl(url, file);
-      return filePath;
-    } catch (error) {
-      console.error('Upload error:', error);
-      return null;
-    }
+  ): Promise<string> => {
+    const { url, filePath } = await api.post<{ url: string; filePath: string }>(
+      `/offerings/${offeringId}/${kind === 'media' ? 'media' : 'documents'}/upload-url`,
+      { fileName: file.name, contentType: file.type },
+    );
+    await putFileToSignedUrl(url, file);
+    return filePath;
   };
 
   const handleFormSubmit = async (data: CreateOfferingFormData, isDraft = false) => {
@@ -317,6 +317,10 @@ export const CreateOfferingForm: React.FC<CreateOfferingFormProps> = ({
 
       const offering = await api.post<{ id: string }>('/offerings', offeringData);
 
+      // Failures collected rather than swallowed — surfaced to the user
+      // below instead of a blanket "success" toast regardless of outcome.
+      const failedUploads: string[] = [];
+
       // Upload media files
       const mediaUploads: Array<{ type: string; file: File; order?: number }> = [];
 
@@ -332,9 +336,8 @@ export const CreateOfferingForm: React.FC<CreateOfferingFormProps> = ({
       }
 
       for (const upload of mediaUploads) {
-        const filePath = await uploadFile(upload.file, offering.id, 'media');
-
-        if (filePath) {
+        try {
+          const filePath = await uploadFile(upload.file, offering.id, 'media');
           await api.post(`/offerings/${offering.id}/media`, {
             mediaType: upload.type,
             filePath,
@@ -343,6 +346,9 @@ export const CreateOfferingForm: React.FC<CreateOfferingFormProps> = ({
             mimeType: upload.file.type,
             displayOrder: upload.order || 0,
           });
+        } catch (error) {
+          console.error(`Failed to upload ${upload.file.name}:`, error);
+          failedUploads.push(upload.file.name);
         }
       }
 
@@ -358,9 +364,8 @@ export const CreateOfferingForm: React.FC<CreateOfferingFormProps> = ({
       for (const docUpload of documentUploads) {
         if (docUpload.files) {
           for (const file of docUpload.files) {
-            const filePath = await uploadFile(file, offering.id, 'document');
-
-            if (filePath) {
+            try {
+              const filePath = await uploadFile(file, offering.id, 'document');
               await api.post(`/offerings/${offering.id}/documents`, {
                 documentCategory: docUpload.category,
                 title: file.name,
@@ -370,6 +375,9 @@ export const CreateOfferingForm: React.FC<CreateOfferingFormProps> = ({
                 mimeType: file.type,
                 isRequired: docUpload.required,
               });
+            } catch (error) {
+              console.error(`Failed to upload ${file.name}:`, error);
+              failedUploads.push(file.name);
             }
           }
         }
@@ -397,7 +405,13 @@ export const CreateOfferingForm: React.FC<CreateOfferingFormProps> = ({
         }
       }
 
-      toast.success(isDraft ? "Draft saved successfully" : "Offering created successfully");
+      if (failedUploads.length > 0) {
+        toast.error(
+          `${isDraft ? 'Draft saved' : 'Offering created'}, but ${failedUploads.length} file(s) failed to upload: ${failedUploads.join(', ')}. Re-upload them from Edit Offering.`,
+        );
+      } else {
+        toast.success(isDraft ? "Draft saved successfully" : "Offering created successfully");
+      }
 
       navigate('/admin/offerings');
   };
@@ -457,6 +471,10 @@ export const CreateOfferingForm: React.FC<CreateOfferingFormProps> = ({
       await api.delete(`/offerings/${offering.id}/media/${mediaId}`);
     }
 
+    // Failures collected rather than swallowed — surfaced to the user below
+    // instead of a blanket "success" toast regardless of outcome.
+    const failedUploads: string[] = [];
+
     // Handle new media uploads (keep existing ones, add new ones —
     // replaceExisting swaps out any prior media of the same type in one
     // atomic call, matching the original delete-then-insert behavior)
@@ -474,9 +492,8 @@ export const CreateOfferingForm: React.FC<CreateOfferingFormProps> = ({
     }
 
     for (const upload of mediaUploads) {
-      const filePath = await uploadFile(upload.file, offering.id, 'media');
-
-      if (filePath) {
+      try {
+        const filePath = await uploadFile(upload.file, offering.id, 'media');
         await api.post(`/offerings/${offering.id}/media`, {
           mediaType: upload.type,
           filePath,
@@ -486,6 +503,9 @@ export const CreateOfferingForm: React.FC<CreateOfferingFormProps> = ({
           displayOrder: upload.order || 0,
           replaceExisting: true,
         });
+      } catch (error) {
+        console.error(`Failed to upload ${upload.file.name}:`, error);
+        failedUploads.push(upload.file.name);
       }
     }
 
@@ -501,9 +521,8 @@ export const CreateOfferingForm: React.FC<CreateOfferingFormProps> = ({
     for (const docUpload of documentUploads) {
       if (docUpload.files) {
         for (const file of docUpload.files) {
-          const filePath = await uploadFile(file, offering.id, 'document');
-
-          if (filePath) {
+          try {
+            const filePath = await uploadFile(file, offering.id, 'document');
             await api.post(`/offerings/${offering.id}/documents`, {
               documentCategory: docUpload.category,
               title: file.name,
@@ -513,6 +532,9 @@ export const CreateOfferingForm: React.FC<CreateOfferingFormProps> = ({
               mimeType: file.type,
               isRequired: docUpload.required,
             });
+          } catch (error) {
+            console.error(`Failed to upload ${file.name}:`, error);
+            failedUploads.push(file.name);
           }
         }
       }
@@ -546,7 +568,13 @@ export const CreateOfferingForm: React.FC<CreateOfferingFormProps> = ({
       }
     }
 
-    toast.success(isDraft ? "Draft updated successfully" : "Offering updated successfully");
+    if (failedUploads.length > 0) {
+      toast.error(
+        `${isDraft ? 'Draft updated' : 'Offering updated'}, but ${failedUploads.length} file(s) failed to upload: ${failedUploads.join(', ')}. Try re-uploading them.`,
+      );
+    } else {
+      toast.success(isDraft ? "Draft updated successfully" : "Offering updated successfully");
+    }
 
     navigate('/admin/offerings');
   };
