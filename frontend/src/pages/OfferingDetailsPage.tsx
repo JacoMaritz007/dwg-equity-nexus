@@ -5,10 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
-import { 
-  ArrowLeft, 
-  Building, 
-  Calendar, 
+import {
+  ArrowLeft,
+  Calendar,
   DollarSign, 
   Target, 
   Users, 
@@ -25,6 +24,7 @@ import { useVerificationStatus } from '@/hooks/useVerificationStatus';
 import { Navigation } from '@/components/layout/Navigation';
 import { PledgeWizard } from '@/components/pledge/PledgeWizard';
 import { PledgeProgressBar } from '@/components/pledge/PledgeProgressBar';
+import { OfferingImageGallery } from '@/components/offerings/OfferingImageGallery';
 import { toast } from 'sonner';
 import { useDocuments } from '@/hooks/useDocuments';
 
@@ -38,8 +38,6 @@ export const OfferingDetailsPage: React.FC = () => {
   const [offering, setOffering] = useState<InvestmentOfferingWithDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [showInvestmentModal, setShowInvestmentModal] = useState(false);
-  const [featuredImageError, setFeaturedImageError] = useState(false);
-  const [galleryImageErrors, setGalleryImageErrors] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const loadOffering = async () => {
@@ -123,52 +121,7 @@ export const OfferingDetailsPage: React.FC = () => {
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Image */}
           <div className="lg:w-1/2">
-            <div className="aspect-video w-full bg-muted rounded-lg overflow-hidden">
-              {offering.offering_media?.find(media => media.media_type === 'featured_image')?.url && !featuredImageError ? (
-                <img
-                  src={offering.offering_media.find(media => media.media_type === 'featured_image')?.url}
-                  alt={offering.title}
-                  className="w-full h-full object-cover"
-                  onError={() => setFeaturedImageError(true)}
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-muted">
-                  <Building className="h-20 w-20 text-muted-foreground" />
-                </div>
-              )}
-            </div>
-            
-            {/* Gallery Images */}
-            {offering.offering_media && offering.offering_media.filter(media => media.media_type === 'gallery_image').length > 0 && (
-              <div className="mt-4">
-                <h4 className="font-medium mb-2">Gallery</h4>
-                <div className="grid grid-cols-3 gap-2">
-                  {offering.offering_media
-                    .filter(media => media.media_type === 'gallery_image')
-                    .slice(0, 6)
-                    .map((media, index) => (
-                      <div key={media.id} className="aspect-video bg-muted rounded overflow-hidden cursor-pointer hover:opacity-80 transition-opacity">
-                        {!galleryImageErrors[media.id] ? (
-                          <img
-                            src={media.url}
-                            alt={`${offering.title} gallery ${index + 1}`}
-                            className="w-full h-full object-cover"
-                            onError={() => setGalleryImageErrors(prev => ({ ...prev, [media.id]: true }))}
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center bg-muted">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground">
-                              <rect width="18" height="18" x="3" y="3" rx="2" ry="2"/>
-                              <circle cx="9" cy="9" r="2"/>
-                              <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>
-                            </svg>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                </div>
-              </div>
-            )}
+            <OfferingImageGallery media={offering.offering_media} title={offering.title} />
           </div>
 
           {/* Key Information */}
